@@ -4,3 +4,4 @@
 - [Secrets can go empty in shells](cloudflare-token-shell-access.md) — any secret can show empty in ShellExec despite existing; re-request via requestSecrets before assuming a block
 - [Missing avatar upload route symptom](avatar-upload-route.md) — a "shows in one place, not elsewhere" bug can mean the persist endpoint 404s while local state still renders
 - [Security scanning availability](security-scanning-availability.md) — DeepSeek is not approved; failed DeepAI moderation may bypass new uploads only with a visible warning
+- [Replit Git history](replit-git-history.md) — local branch cleanup does not remove Replit's managed agent ledger or alter remote history

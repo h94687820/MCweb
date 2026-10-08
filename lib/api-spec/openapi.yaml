@@ -71,6 +71,80 @@ paths:
                 items:
                   $ref: "#/components/schemas/UploadedFile"
 
+  /files/mine:
+    get:
+      operationId: listMyFiles
+      tags: [files]
+      summary: List all releases uploaded by the signed-in user
+      responses:
+        "200":
+          description: Releases uploaded by the current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedFile"
+        "401":
+          description: Authentication required
+
+  /files/upload:
+    post:
+      operationId: uploadFile
+      tags: [files]
+      summary: Upload a new mod or map
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                  maxLength: 100
+                type:
+                  type: string
+                  enum: [mod, map]
+                edition:
+                  type: string
+                  enum: [java, bedrock]
+                customId:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  pattern: "^[a-z0-9-]+$"
+                gameVersion:
+                  type: string
+                  maxLength: 32
+                  pattern: "^\\d+(\\.\\d+){0,3}$"
+                description:
+                  type: string
+                  maxLength: 2000
+                coverImage:
+                  type: string
+                  format: binary
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required: [file, title, type, edition, customId, gameVersion]
+      responses:
+        "201":
+          description: Uploaded file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+        "400":
+          description: Invalid upload data
+        "409":
+          description: The custom ID is already taken
+
   /files/{id}:
     get:
       operationId: getFile
@@ -107,6 +181,102 @@ paths:
           description: Deleted
         "404":
           description: Not found
+
+  /files/{id}/metadata:
+    patch:
+      operationId: updateFileMetadata
+      tags: [files]
+      summary: Update a file's shared title, custom ID, and description
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileMetadataInput"
+      responses:
+        "200":
+          description: Updated file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+        "400":
+          description: Invalid metadata
+        "403":
+          description: The user does not own this file
+        "404":
+          description: Not found
+        "409":
+          description: The custom ID is already taken
+
+  /files/{id}/versions:
+    get:
+      operationId: listFileVersions
+      tags: [files]
+      summary: List all game-version releases for a file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Releases ordered from newest game version to oldest
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedFile"
+        "404":
+          description: Not found
+    post:
+      operationId: addFileVersion
+      tags: [files]
+      summary: Upload a new game-version release for a file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                gameVersion:
+                  type: string
+                  maxLength: 32
+                  pattern: "^\\d+(\\.\\d+){0,3}$"
+              required: [file, gameVersion]
+      responses:
+        "201":
+          description: New release uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+        "400":
+          description: Invalid release data
+        "403":
+          description: The user does not own this file
+        "404":
+          description: Not found
+        "409":
+          description: This game version already exists
 
   /files/{id}/download:
     get:
@@ -334,6 +504,12 @@ components:
           items:
             type: string
           nullable: true
+        gameVersion:
+          type: ["string", "null"]
+        versionGroupId:
+          type: string
+        rootFileId:
+          type: integer
         uploadedBy:
           type: ["string", "null"]
       required:
@@ -345,6 +521,26 @@ components:
         - size
         - uploadedAt
         - scanStatus
+        - gameVersion
+        - versionGroupId
+        - rootFileId
+
+    FileMetadataInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        customId:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: "^[a-z0-9-]+$"
+        description:
+          type: string
+          maxLength: 2000
+      required: [title, customId, description]
 
     FileStats:
       type: object

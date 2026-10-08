@@ -71,10 +71,16 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /^.*\/api\/.*/,
+            urlPattern: ({ request, url }) =>
+              request.method === "GET" &&
+              url.pathname.includes("/api/") &&
+              !request.headers.has("authorization") &&
+              !/^\/api\/(?:settings(?:\/|$)|profiles\/me(?:\/|$)|files\/[^/]+\/download(?:\/|$))/.test(
+                url.pathname,
+              ),
             handler: "NetworkFirst",
             options: {
-              cacheName: "api-cache",
+              cacheName: "public-api-cache",
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
             },
           },

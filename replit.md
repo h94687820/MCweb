@@ -1,0 +1,92 @@
+# WhiteWase — Minecraft Mods & Maps Hub
+
+A platform for uploading and managing Minecraft mods and maps, with VirusTotal scanning and theme customization.
+
+## Run & Operate
+
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/minecraft-hub run dev` — run the frontend (port 18234)
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
+- Required env: `BAAS_BASE_URL`, `BAAS_API_KEY` — BaaS platform credentials (replaces Postgres/Supabase)
+- Optional env: `VIRUSTOTAL_API_KEY` — enables file scanning via VirusTotal
+- Optional secret: `DEEPAI_API_KEY` — enables DeepAI image moderation; the Cloudflare deploy script copies it to the Worker only when present and never deletes an existing Worker value when absent
+- For new uploads, if DeepAI is unavailable or rejects its key, publishing continues with a visible moderation warning; images that DeepAI successfully flags as unsafe are still rejected. DeepSeek is not used.
+- VirusTotal scan status is currently informational and does not gate downloads; files with any scan status can be downloaded while VirusTotal is under maintenance.
+
+## Stack
+
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5 + Multer (receives uploads, then streams to BaaS storage)
+- Storage & DB: BaaS platform (`baas-platform.mcfoxy.workers.dev`) — replaces PostgreSQL + Supabase
+- Frontend: React + Vite + TailwindCSS + shadcn/ui + Framer Motion
+- Validation: Zod (`zod/v4`), `drizzle-zod`
+- API codegen: Orval (from OpenAPI spec)
+- Build: esbuild (CJS bundle)
+
+## Where things live
+
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
+- `artifacts/api-server/src/lib/baas.ts` — BaaS client for Node.js (all data + storage operations)
+- `artifacts/api-server/src/routes/files.ts` — file upload, list, scan routes (BaaS-backed)
+- `artifacts/api-server/src/routes/settings.ts` — settings CRUD routes (BaaS-backed)
+- `artifacts/api-server/src/routes/profiles.ts` — profile CRUD + avatar upload routes (BaaS-backed)
+- `artifacts/cloudflare-app/src/lib/baas.ts` — BaaS client for Cloudflare Workers (same API surface)
+- `artifacts/cloudflare-app/` — Cloudflare Workers deployment target (full app on Workers)
+- `artifacts/minecraft-hub/src/pages/` — Home, Upload, Settings, Profile pages
+- `artifacts/minecraft-hub/src/components/Layout.tsx` — sidebar navigation
+- `artifacts/minecraft-hub/src/index.css` — theme variables (6 themes)
+- User identity: Firebase Authentication is the only active provider in preview and production; BaaS `profiles` collection is the user-facing profile store
+
+## Architecture decisions
+
+- **BaaS is the sole data + storage backend** — no PostgreSQL, no Supabase, no Drizzle
+- File uploads: received by Express via multer (temp disk) → uploaded to BaaS storage → temp deleted
+- File downloads: proxied through Express to preserve Content-Disposition headers for Safari
+- Images (cover/gallery/avatar) stored as full BaaS download URLs (publicly accessible, no auth needed)
+- VirusTotal scanning: async background process; scan status is informational and does not currently gate downloads
+- Settings stored as a BaaS record (single row, auto-created on first GET)
+- Profiles stored as BaaS records; username uniqueness enforced via BaaS `setUniqueFields`
+- Theme switching applies CSS class on `<html>` element (e.g. `theme-creeper`)
+- OpenAPI spec does not define the multipart upload endpoint; handled manually with multer
+
+## BaaS API surface (baas-platform.mcfoxy.workers.dev)
+
+- `GET/POST /api/v1/data/:collection` — list (with pagination) / create records
+- `GET/PATCH/DELETE /api/v1/data/:collection/:id` — get / partial update / delete a record
+- `PUT /api/v1/collections/:collection/schema { uniqueFields }` — enforce field uniqueness
+- `POST /api/v1/storage/upload { name, size, contentType }` → `{ uploadURL, downloadUrl, fileId }`
+- `PUT <uploadURL>` — upload raw bytes (signed short-lived token, relative to base URL)
+- `DELETE /api/v1/storage/:fileId` — delete a stored object
+- Download URLs are **publicly accessible** (no API key needed) — safe to embed in `<img src>`
+
+## Product
+
+- Dashboard with stats (total mods, maps, clean, malicious) and file lists
+- Upload page: drag-and-drop or file picker, select Mod or Map type + Java/Bedrock edition
+- VirusTotal scan triggered on upload; background polling updates status
+- Settings: 6 color themes (Creeper, Nether, Ocean, End, Sky, Default) + dark mode toggle
+
+## User preferences
+
+_Populate as you build — explicit user instructions worth remembering across sessions._
+
+## Gotchas
+
+- `files/stats` route must be defined BEFORE `files/:id` in Express to avoid route collision
+- VirusTotal free API: 4 req/min, 500 req/day — scan polling retries up to 20x with 5s delay
+- File upload is NOT generated by Orval — use raw fetch to `${BASE_URL}api/files/upload`
+- Avatar upload is also NOT generated by Orval — raw fetch to `${BASE_URL}api/profiles/avatar` (multipart, field name `avatar`)
+- Image URLs from BaaS are full absolute URLs; legacy data may have bare filenames — `resolveImageUrl()` helper in home.tsx and file-detail.tsx handles both
+- BaaS list endpoints return all records (paginated at 200/page); filtering/search is done client-side in route handlers
+- BaaS `patchRecord` does partial update (merges fields) — you don't need to pass the full object
+- Any change that adds a new `FileData` or `ProfileData` field must be backward-compatible (old records won't have it — use `?? null` or `?? []` as defaults)
+
+## Cloudflare Deployment
+
+The `artifacts/cloudflare-app/` directory is a standalone Cloudflare Workers app that serves both the API and frontend SPA. Firebase is the only authentication provider in Replit preview and the published Cloudflare app. The deploy command is `pnpm --filter @workspace/cloudflare-app run deploy` or `./deploy-cloudflare.sh`. The Express API and Worker validate Firebase ID tokens; upload, profile, and settings requests send the same bearer token. Existing BaaS records and uploaded files are not deleted or reassigned during the authentication change. See `FIREBASE_AUTH.md` for Firebase setup and account behavior.
+
+## Pointers
+
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details

@@ -1,0 +1,21 @@
+name = "minecraft-hub"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static frontend build output (built by `pnpm --filter @workspace/minecraft-hub run build`)
+[assets]
+directory = "../minecraft-hub/dist/public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Service Binding: calls baas-platform Worker directly (avoids workers.dev fetch restriction)
+[[services]]
+binding = "BAAS_SERVICE"
+service = "baas-platform"
+
+# Non-secret vars. Secrets (BAAS_API_KEY, BAAS_BASE_URL, DEEPAI_API_KEY,
+# VIRUSTOTAL_API_KEY)
+# are set via `wrangler secret put <NAME>` and must NOT be committed here.
+[vars]
+NODE_ENV = "production"

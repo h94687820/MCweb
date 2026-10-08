@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>WhiteWase — Mods &amp; Maps Hub</title>
+    <meta name="description" content="Upload and manage Minecraft mods and maps with VirusTotal scanning." />
+    <meta name="robots" content="index, follow" />
+
+    <!-- PWA / mobile -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WhiteWase" />
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- Apple touch icons -->
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <!-- OG -->
+    <meta property="og:title" content="WhiteWase — Mods &amp; Maps Hub" />
+    <meta property="og:description" content="Upload and manage Minecraft mods and maps with VirusTotal scanning." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="opengraph.jpg" />
+  </head>
+  <body>
+    <!-- Apply theme + dark mode IMMEDIATELY before React loads to prevent white flash -->
+    <script>
+      (function () {
+        try {
+          var dark = localStorage.getItem("mc-dark");
+          var theme = localStorage.getItem("mc-theme") || "default";
+          // Default to dark mode if no preference is saved
+          if (dark === null || dark === "true") {
+            document.documentElement.classList.add("dark");
+          }
+          document.documentElement.classList.add("theme-" + theme);
+        } catch (e) {
+          // localStorage blocked — just apply dark by default
+          document.documentElement.classList.add("dark", "theme-default");
+        }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

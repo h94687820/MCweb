@@ -1,0 +1,306 @@
+import { Link, useLocation } from "wouter";
+import {
+  LayoutGrid,
+  Upload,
+  Settings,
+  Shield,
+  Download,
+  LogIn,
+  LogOut,
+  User,
+  X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { usePWAInstall } from "@/hooks/use-pwa-install";
+import { useAppAuth } from "@/contexts/auth-context";
+import { useLanguage } from "@/contexts/language-context";
+import { useState } from "react";
+import { useGetMyProfile, getGetMyProfileQueryKey } from "@workspace/api-client-react";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function readInstallBannerDismissed() {
+  try {
+    return localStorage.getItem("pwa-banner-dismissed") === "1";
+  } catch {
+    return false;
+  }
+}
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
+  const [location, setLocation] = useLocation();
+  const { canInstall, install } = usePWAInstall();
+  const { user, isLoaded, signOut } = useAppAuth();
+  const { t } = useLanguage();
+
+  const { data: profile } = useGetMyProfile({
+    query: { queryKey: getGetMyProfileQueryKey(), enabled: !!user },
+  });
+
+  const avatarSrc = profile?.avatarUrl || user?.imageUrl;
+  const displayLabel =
+    profile?.displayName ||
+    (profile?.username ? `@${profile.username}` : "User");
+
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(readInstallBannerDismissed);
+
+  const navItems = [
+    { href: "/", label: t.nav.dashboard, icon: LayoutGrid },
+    { href: "/upload", label: t.nav.upload, icon: Upload },
+    { href: "/settings", label: t.nav.settings, icon: Settings },
+  ];
+
+  function dismissBanner() {
+    setInstallBannerDismissed(true);
+    try {
+      localStorage.setItem("pwa-banner-dismissed", "1");
+    } catch {
+      // Dismiss the banner for this session even when browser storage is unavailable.
+    }
+  }
+
+  async function handleInstall() {
+    await install();
+    dismissBanner();
+  }
+
+  function handleSignOut() {
+    void signOut({ redirectUrl: basePath || "/" });
+  }
+
+  function handleSignIn() {
+    setLocation("/sign-in");
+  }
+
+  const showInstallBanner = canInstall && !installBannerDismissed;
+
+  return (
+    <div className="flex min-h-screen flex-col md:flex-row">
+      {/* ── Install Banner (mobile top) ─────────────────────────────────────── */}
+      {showInstallBanner && (
+        <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground flex items-center gap-3 px-4 py-3 shadow-lg">
+          <img
+            src="/logo.png"
+            alt="WhiteWase"
+            className="w-5 h-5 flex-shrink-0 rounded-sm object-cover"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold leading-none">WhiteWase</p>
+            <p className="text-xs opacity-80 mt-0.5">{t.nav.install}</p>
+          </div>
+          <button
+            onClick={handleInstall}
+            className="flex-shrink-0 bg-primary-foreground text-primary text-xs font-bold px-3 py-1.5"
+          >
+            {t.nav.install}
+          </button>
+          <button
+            onClick={dismissBanner}
+            className="flex-shrink-0 opacity-70 hover:opacity-100"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Desktop Sidebar ──────────────────────────────────────────────────── */}
+      <aside className="hidden md:flex w-64 flex-shrink-0 bg-sidebar border-r border-sidebar-border flex-col sticky top-0 h-screen overflow-hidden">
+        {/* Logo */}
+        <div className="p-6 border-b border-sidebar-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center overflow-hidden">
+              <img
+                src="/logo.png"
+                alt="WhiteWase"
+                className="w-9 h-9 rounded-md object-cover"
+              />
+            </div>
+            <div>
+              <p className="font-bold text-sidebar-foreground leading-none tracking-tight">
+                WhiteWase
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                Mods &amp; Maps Hub
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const isActive = location === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                data-testid={`nav-${label.toLowerCase()}`}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-sidebar-border space-y-3">
+          {isLoaded && user ? (
+            <div className="space-y-2">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2.5 px-1 hover:opacity-80 transition-opacity cursor-pointer group"
+              >
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={displayLabel}
+                    className="w-6 h-6 rounded-full flex-shrink-0 object-cover ring-1 ring-transparent group-hover:ring-primary transition-all"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <User className="w-3 h-3 text-primary" />
+                  </div>
+                )}
+                <span className="text-xs text-sidebar-foreground truncate flex-1 group-hover:text-primary transition-colors">
+                  {displayLabel}
+                </span>
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border border-sidebar-border hover:border-primary/60 hover:text-primary transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+                {t.nav.signOut}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={handleSignIn}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border border-sidebar-border hover:border-primary/60 hover:text-primary transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5 flex-shrink-0" />
+                {t.nav.signIn}
+              </button>
+            </div>
+          )}
+          {canInstall && (
+            <button
+              onClick={handleInstall}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-sidebar-foreground border border-sidebar-border hover:border-primary/60 hover:text-primary transition-colors"
+            >
+              <Download className="w-3.5 h-3.5 flex-shrink-0" />
+              {t.nav.install}
+            </button>
+          )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+            <Shield className="w-3.5 h-3.5" />
+            <span>{t.nav.virusTotalMaintenance}</span>
+          </div>
+          <div className="text-xs text-muted-foreground text-center">
+            by{" "}
+            <a
+              href="https://youtube.com/@whitewase?si=33-wgad8O3-VSyd-"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-primary hover:underline"
+            >
+              WhiteWase
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Mobile Top Bar ───────────────────────────────────────────────────── */}
+      <header
+        className={cn(
+          "md:hidden flex items-center justify-between px-4 bg-sidebar border-b border-sidebar-border flex-shrink-0",
+          showInstallBanner ? "mt-14 h-14" : "h-14",
+        )}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 flex items-center justify-center overflow-hidden">
+            <img
+              src="/logo.png"
+              alt="WhiteWase"
+              className="w-7 h-7 rounded-md object-cover"
+            />
+          </div>
+          <span className="font-bold text-sm tracking-tight">WhiteWase</span>
+        </div>
+        {isLoaded && user ? (
+          <div className="flex items-center gap-3">
+            <Link href="/profile" className="flex items-center">
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt={displayLabel}
+                  className="w-7 h-7 rounded-full object-cover ring-1 ring-transparent hover:ring-primary transition-all"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+                  <User className="w-4 h-4 text-primary" />
+                </div>
+              )}
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-primary transition-colors"
+              aria-label={t.nav.signOut}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleSignIn}
+            className="text-xs text-primary font-medium flex items-center gap-1"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            {t.nav.signIn}
+          </button>
+        )}
+      </header>
+
+      {/* ── Main Content ─────────────────────────────────────────────────────── */}
+      <main className={cn("flex-1 overflow-auto", "pb-20 md:pb-0")}>
+        {children}
+      </main>
+
+      {/* ── Mobile Bottom Navigation ─────────────────────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-sidebar border-t border-sidebar-border flex items-stretch h-16 safe-area-pb">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = location === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground/50">
+          <Shield className="w-5 h-5" />
+          <span>Safe</span>
+        </div>
+      </nav>
+    </div>
+  );
+}

@@ -1,0 +1,470 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Minecraft Mods & Maps Hub API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: files
+    description: Mod and map file operations
+  - name: settings
+    description: User settings
+  - name: profiles
+    description: User profile operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /files:
+    get:
+      operationId: listFiles
+      tags: [files]
+      summary: List all uploaded files
+      parameters:
+        - name: edition
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [java, bedrock]
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [mod, map]
+        - name: scanStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, scanning, clean, malicious, error]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search by file name or custom ID
+      responses:
+        "200":
+          description: List of uploaded files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedFile"
+
+  /files/{id}:
+    get:
+      operationId: getFile
+      tags: [files]
+      summary: Get file details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: File details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+        "404":
+          description: Not found
+
+    delete:
+      operationId: deleteFile
+      tags: [files]
+      summary: Delete a file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /files/{id}/download:
+    get:
+      operationId: downloadFile
+      tags: [files]
+      summary: Download a file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+
+  /files/{id}/scan:
+    post:
+      operationId: rescanFile
+      tags: [files]
+      summary: Re-run the VirusTotal scan for a file (e.g. after a prior scan errored out)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Scan started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+        "404":
+          description: Not found
+        "409":
+          description: A scan is already in progress for this file
+
+  /files/stats:
+    get:
+      operationId: getFileStats
+      tags: [files]
+      summary: Get file upload statistics
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileStats"
+
+  /profiles/me:
+    get:
+      operationId: getMyProfile
+      tags: [profiles]
+      summary: Get current user's profile
+      responses:
+        "200":
+          description: Profile found or created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          description: Unauthorized
+
+    put:
+      operationId: updateMyProfile
+      tags: [profiles]
+      summary: Update current user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: Validation error or username taken
+        "401":
+          description: Unauthorized
+
+  /profiles/check-username:
+    get:
+      operationId: checkUsername
+      tags: [profiles]
+      summary: Check if a username is available
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: excludeUserId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsernameCheck"
+
+  /profiles/{username}:
+    get:
+      operationId: getProfileByUsername
+      tags: [profiles]
+      summary: Get a public profile by username
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: Not found
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get current settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    UploadedFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        customId:
+          type: ["string", "null"]
+        name:
+          type: string
+        originalName:
+          type: string
+        title:
+          type: ["string", "null"]
+        edition:
+          type: string
+          enum: [java, bedrock]
+        type:
+          type: string
+          enum: [mod, map]
+        size:
+          type: integer
+        mimeType:
+          type: ["string", "null"]
+        uploadedAt:
+          type: string
+        scanStatus:
+          type: string
+          enum: [pending, scanning, clean, malicious, error, skipped]
+        scanDetails:
+          type: ["string", "null"]
+        scanEngine:
+          type: ["string", "null"]
+        virusTotalLink:
+          type: ["string", "null"]
+        detectionRatio:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        coverImage:
+          type: ["string", "null"]
+        images:
+          type: array
+          items:
+            type: string
+          nullable: true
+        uploadedBy:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - originalName
+        - edition
+        - type
+        - size
+        - uploadedAt
+        - scanStatus
+
+    FileStats:
+      type: object
+      properties:
+        totalFiles:
+          type: integer
+        totalMods:
+          type: integer
+        totalMaps:
+          type: integer
+        javaMods:
+          type: integer
+        javaMaps:
+          type: integer
+        bedrockMods:
+          type: integer
+        bedrockMaps:
+          type: integer
+        cleanFiles:
+          type: integer
+        maliciousFiles:
+          type: integer
+        pendingFiles:
+          type: integer
+        totalSizeBytes:
+          type: integer
+      required:
+        - totalFiles
+        - totalMods
+        - totalMaps
+        - javaMods
+        - javaMaps
+        - bedrockMods
+        - bedrockMaps
+        - cleanFiles
+        - maliciousFiles
+        - pendingFiles
+        - totalSizeBytes
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - userId
+        - username
+        - createdAt
+        - updatedAt
+
+    ProfileInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 20
+          pattern: "^[a-zA-Z0-9_-]{3,20}$"
+        displayName:
+          type: string
+          maxLength: 50
+        bio:
+          type: string
+          maxLength: 300
+        avatarUrl:
+          type: string
+          maxLength: 2048
+          pattern: "^$|^https://[^\\s]+$"
+
+    UsernameCheck:
+      type: object
+      properties:
+        available:
+          type: boolean
+        valid:
+          type: boolean
+      required:
+        - available
+        - valid
+
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+        theme:
+          type: string
+          enum: [creeper, nether, ocean, end, sky, default]
+        darkMode:
+          type: boolean
+        virusTotalEnabled:
+          type: boolean
+      required:
+        - id
+        - theme
+        - darkMode
+        - virusTotalEnabled
+
+    SettingsInput:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [creeper, nether, ocean, end, sky, default]
+        darkMode:
+          type: boolean
+        virusTotalEnabled:
+          type: boolean

@@ -353,7 +353,7 @@ export default function FileDetailPage() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAppAuth();
   const fileId = Number(params.id);
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -370,11 +370,12 @@ export default function FileDetailPage() {
   const deleteMutation = useDeleteFile();
 
   const isOwner = !!user && !!file && file.uploadedBy === user.id;
-  const canRescan = isOwner && (file?.scanStatus === "error" || file?.scanStatus === "pending");
+  const currentScanStatus = versions[0]?.scanStatus ?? file?.scanStatus;
+  const canRescan = isOwner && (currentScanStatus === "error" || currentScanStatus === "pending");
 
   function handleRescan() {
     if (!file) return;
-    rescanMutation.mutate({ id: file.id }, { onSuccess: handleUpdated });
+    rescanMutation.mutate({ id: versions[0]?.id ?? file.id }, { onSuccess: handleUpdated });
   }
 
   function handleDelete() {
@@ -430,10 +431,10 @@ export default function FileDetailPage() {
 
   const TypeIcon = file.type === "mod" ? Package : Map;
   const EditionIcon = file.edition === "java" ? Cpu : Pickaxe;
-  const date = new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const images = (file.images as string[] | null) ?? [];
   const latestRelease = versions[0] ?? file;
   const olderReleases = versions.filter((release) => release.id !== latestRelease.id);
+  const date = new Date(latestRelease.uploadedAt).toLocaleDateString(language, { month: "long", day: "numeric", year: "numeric" });
 
   return (
     <div className="p-6 md:p-8 max-w-3xl">
@@ -472,7 +473,7 @@ export default function FileDetailPage() {
               </p>
             )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <ScanStatusBadge status={file.scanStatus} />
+              <ScanStatusBadge status={latestRelease.scanStatus} />
               {canRescan && (
                 <button
                   onClick={handleRescan}
@@ -490,11 +491,9 @@ export default function FileDetailPage() {
                 <EditionIcon className="w-3 h-3" />
                 {file.edition === "java" ? "Java Edition" : "Bedrock Edition"}
               </span>
-              {latestRelease.gameVersion && (
-                <span className="text-xs font-mono text-primary" data-testid="text-current-game-version">
-                  {t.fileDetail.gameVersionLabel}: {latestRelease.gameVersion}
-                </span>
-              )}
+              <span className="text-xs font-mono text-primary" data-testid="text-current-game-version">
+                {t.fileDetail.gameVersionLabel}: {latestRelease.gameVersion || "—"}
+              </span>
             </div>
           </div>
           {isOwner && (
@@ -525,7 +524,7 @@ export default function FileDetailPage() {
             <HardDrive className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">File size</p>
-              <p className="text-sm font-mono font-medium">{formatBytes(file.size)}</p>
+              <p className="text-sm font-mono font-medium">{formatBytes(latestRelease.size)}</p>
             </div>
           </div>
           <div className="bg-card border border-card-border p-3 flex items-center gap-3">
@@ -539,14 +538,15 @@ export default function FileDetailPage() {
 
         {/* Download */}
         <a
-          href={`${base}/api/files/${file.id}/download`}
-          download={file.originalName}
+          href={`${base}/api/files/${latestRelease.id}/download`}
+          download={latestRelease.originalName}
           className="w-full"
           title={t.fileDetail.download}
         >
           <Button className="w-full h-11">
             <Download className="w-4 h-4 mr-2" />
-            Download {file.title || file.originalName}
+            {t.fileDetail.download} {file.title || file.originalName}
+            {latestRelease.gameVersion ? ` · ${latestRelease.gameVersion}` : ""}
           </Button>
         </a>
 

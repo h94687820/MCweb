@@ -123,6 +123,11 @@ function FileRow({ file, onOpen }: { file: UploadedFile; onOpen: () => void }) {
             <span className="font-mono">{formatBytes(file.size)}</span>
             <span>{date}</span>
             <span className="uppercase tracking-[.14em]">{file.edition} / {file.type}</span>
+            {file.gameVersion && (
+              <span className="font-mono text-primary" data-testid={`text-game-version-${file.id}`}>
+                {t.fileDetail.gameVersionLabel}: {file.gameVersion}
+              </span>
+            )}
           </span>
         </span>
       </button>

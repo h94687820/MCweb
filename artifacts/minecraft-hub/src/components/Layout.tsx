@@ -52,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { href: "/", label: t.nav.dashboard, icon: LayoutGrid },
     { href: "/upload", label: t.nav.upload, icon: Upload },
-    ...(user ? [{ href: "/library", label: t.nav.library, icon: Library }] : []),
+    { href: "/library", label: t.nav.library, icon: Library },
     { href: "/settings", label: t.nav.settings, icon: Settings },
   ];
 

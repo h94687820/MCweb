@@ -162,7 +162,7 @@ export default function LibraryPage() {
       <header className="creator-library-heading">
         <div>
           <div className="library-eyebrow"><span>01</span> {t.library.eyebrow}</div>
-          <h1>{t.library.title}<span>.</span></h1>
+          <h1>{t.library.title}</h1>
           <p>{t.library.subtitle}</p>
         </div>
       </header>

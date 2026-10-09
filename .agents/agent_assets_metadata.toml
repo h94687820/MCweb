@@ -6,3 +6,18 @@ id = "IMQo2v_niwLsmAMm3sG6F"
 uri = "file://modvault-source.tar.gz"
 type = "unspecified"
 title = "ModVault — كود المشروع كاملاً"
+logical_id = "89f3cde6-9c84-4963-bbd0-387c689c5f92"
+
+[[outputs]]
+id = "L7ugWVWo_MyCHc4-ZCQwP"
+uri = "file://Setup.md"
+type = "text"
+title = "دليل إعداد WhiteWase"
+description = "دليل عربي شامل لإعداد Firebase وBaaS وCloudflare، تشغيل المشروع محليًا ونشره على استضافات مختلفة."
+logical_id = "656acd52-0d96-457d-b77c-af52f6617485"
+content_hash = "sha256:6ba6c42224bbae03003dbf914c2a5983eb6f16bd32e50cefb63efdb5e46dd6a0"
+size = 26067
+mtime_ms = 1791559719895
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:b57483e3-3d01-485e-9eb6-d8fd5596e3a2/656acd52-0d96-457d-b77c-af52f6617485/e579423a-150e-4e25-b8ad-63fa7ec80ab5"
+storage_version_token = "1791559728776788"
+content_type = "text/markdown"

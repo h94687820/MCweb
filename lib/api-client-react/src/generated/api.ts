@@ -25,17 +25,17 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AddFileVersionBody,
   CheckUsernameParams,
   FileMetadataInput,
   FileStats,
+  FileUploadInput,
+  FileVersionUploadInput,
   HealthStatus,
   ListFilesParams,
   Profile,
   ProfileInput,
   Settings,
   SettingsInput,
-  UploadFileBody,
   UploadedFile,
   UsernameCheck
 } from './api.schemas';
@@ -388,22 +388,22 @@ export const getUploadFileUrl = () => {
 /**
  * @summary Upload a new mod or map
  */
-export const uploadFile = async (uploadFileBody: UploadFileBody, options?: Parameters<typeof customFetch>[1]): Promise<UploadedFile> => {
+export const uploadFile = async (fileUploadInput: FileUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<UploadedFile> => {
     const formData = new FormData();
-formData.append(`file`, uploadFileBody.file);
-formData.append(`title`, uploadFileBody.title);
-formData.append(`type`, uploadFileBody.type);
-formData.append(`edition`, uploadFileBody.edition);
-formData.append(`customId`, uploadFileBody.customId);
-formData.append(`gameVersion`, uploadFileBody.gameVersion);
-if(uploadFileBody.description !== undefined) {
- formData.append(`description`, uploadFileBody.description);
+formData.append(`file`, fileUploadInput.file);
+formData.append(`title`, fileUploadInput.title);
+formData.append(`type`, fileUploadInput.type);
+formData.append(`edition`, fileUploadInput.edition);
+formData.append(`customId`, fileUploadInput.customId);
+formData.append(`gameVersion`, fileUploadInput.gameVersion);
+if(fileUploadInput.description !== undefined) {
+ formData.append(`description`, fileUploadInput.description);
  }
-if(uploadFileBody.coverImage !== undefined) {
- formData.append(`coverImage`, uploadFileBody.coverImage);
+if(fileUploadInput.coverImage !== undefined) {
+ formData.append(`coverImage`, fileUploadInput.coverImage);
  }
-if(uploadFileBody.images !== undefined) {
- uploadFileBody.images.forEach(value => formData.append(`images`, value));
+if(fileUploadInput.images !== undefined) {
+ fileUploadInput.images.forEach(value => formData.append(`images`, value));
  }
 
   return customFetch<UploadedFile>(getUploadFileUrl(),
@@ -449,9 +449,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UploadFileMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFile>>>
-    export type UploadFileMutationBody = BodyType<UploadFileBody>
+    export type UploadFileMutationBody = BodyType<FileUploadInput>
     export type UploadFileMutationError = ErrorType<void>
-    export type UploadFileMutationVariables = {data: BodyType<UploadFileBody>}
+    export type UploadFileMutationVariables = {data: BodyType<FileUploadInput>}
 
     /**
  * @summary Upload a new mod or map
@@ -844,10 +844,10 @@ export const getAddFileVersionUrl = (id: number,) => {
  * @summary Upload a new game-version release for a file
  */
 export const addFileVersion = async (id: number,
-    addFileVersionBody: AddFileVersionBody, options?: Parameters<typeof customFetch>[1]): Promise<UploadedFile> => {
+    fileVersionUploadInput: FileVersionUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<UploadedFile> => {
     const formData = new FormData();
-formData.append(`file`, addFileVersionBody.file);
-formData.append(`gameVersion`, addFileVersionBody.gameVersion);
+formData.append(`file`, fileVersionUploadInput.file);
+formData.append(`gameVersion`, fileVersionUploadInput.gameVersion);
 
   return customFetch<UploadedFile>(getAddFileVersionUrl(id),
   {
@@ -892,9 +892,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AddFileVersionMutationResult = NonNullable<Awaited<ReturnType<typeof addFileVersion>>>
-    export type AddFileVersionMutationBody = BodyType<AddFileVersionBody>
+    export type AddFileVersionMutationBody = BodyType<FileVersionUploadInput>
     export type AddFileVersionMutationError = ErrorType<void>
-    export type AddFileVersionMutationVariables = {id: number;data: BodyType<AddFileVersionBody>}
+    export type AddFileVersionMutationVariables = {id: number;data: BodyType<FileVersionUploadInput>}
 
     /**
  * @summary Upload a new game-version release for a file

@@ -98,41 +98,7 @@ paths:
         content:
           multipart/form-data:
             schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-                title:
-                  type: string
-                  maxLength: 100
-                type:
-                  type: string
-                  enum: [mod, map]
-                edition:
-                  type: string
-                  enum: [java, bedrock]
-                customId:
-                  type: string
-                  minLength: 3
-                  maxLength: 50
-                  pattern: "^[a-z0-9-]+$"
-                gameVersion:
-                  type: string
-                  maxLength: 32
-                  pattern: "^\\d+(\\.\\d+){0,3}$"
-                description:
-                  type: string
-                  maxLength: 2000
-                coverImage:
-                  type: string
-                  format: binary
-                images:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-              required: [file, title, type, edition, customId, gameVersion]
+              $ref: "#/components/schemas/FileUploadInput"
       responses:
         "201":
           description: Uploaded file
@@ -252,16 +218,7 @@ paths:
         content:
           multipart/form-data:
             schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-                gameVersion:
-                  type: string
-                  maxLength: 32
-                  pattern: "^\\d+(\\.\\d+){0,3}$"
-              required: [file, gameVersion]
+              $ref: "#/components/schemas/FileVersionUploadInput"
       responses:
         "201":
           description: New release uploaded
@@ -541,6 +498,55 @@ components:
           type: string
           maxLength: 2000
       required: [title, customId, description]
+
+    FileUploadInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        title:
+          type: string
+          maxLength: 100
+        type:
+          type: string
+          enum: [mod, map]
+        edition:
+          type: string
+          enum: [java, bedrock]
+        customId:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: "^[a-z0-9-]+$"
+        gameVersion:
+          type: string
+          maxLength: 32
+          pattern: "^\\d{1,8}(\\.\\d{1,8}){0,3}$"
+        description:
+          type: string
+          maxLength: 2000
+        coverImage:
+          type: string
+          format: binary
+        images:
+          type: array
+          items:
+            type: string
+            format: binary
+      required: [file, title, type, edition, customId, gameVersion]
+
+    FileVersionUploadInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+        gameVersion:
+          type: string
+          maxLength: 32
+          pattern: "^\\d{1,8}(\\.\\d{1,8}){0,3}$"
+      required: [file, gameVersion]
 
     FileStats:
       type: object

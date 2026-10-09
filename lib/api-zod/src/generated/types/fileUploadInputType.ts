@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UploadFileBodyType = typeof UploadFileBodyType[keyof typeof UploadFileBodyType];
+export type FileUploadInputType = typeof FileUploadInputType[keyof typeof FileUploadInputType];
 
 
-export const UploadFileBodyType = {
+export const FileUploadInputType = {
   mod: 'mod',
   map: 'map',
 } as const;

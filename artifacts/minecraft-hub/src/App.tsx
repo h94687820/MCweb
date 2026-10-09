@@ -10,6 +10,7 @@ import SettingsPage from "@/pages/settings";
 import FileDetailPage from "@/pages/file-detail";
 import ProfilePage from "@/pages/profile";
 import UserProfilePage from "@/pages/user-profile";
+import LibraryPage from "@/pages/library";
 import NotFound from "@/pages/not-found";
 import { useTheme } from "@/hooks/use-theme";
 import { LanguageProvider } from "@/contexts/language-context";
@@ -58,6 +59,7 @@ function AppContent() {
               <Switch>
                 <Route path="/" component={HomePage} />
                 <Route path="/upload" component={UploadPage} />
+                <Route path="/library" component={LibraryPage} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/profile" component={ProfilePage} />
                 <Route path="/u/:username" component={UserProfilePage} />

@@ -6,10 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './addFileVersionBody';
 export * from './checkUsernameParams';
 export * from './fileMetadataInput';
 export * from './fileStats';
+export * from './fileUploadInput';
+export * from './fileUploadInputEdition';
+export * from './fileUploadInputType';
+export * from './fileVersionUploadInput';
 export * from './healthStatus';
 export * from './listFilesEdition';
 export * from './listFilesParams';
@@ -25,7 +28,4 @@ export * from './uploadedFile';
 export * from './uploadedFileEdition';
 export * from './uploadedFileScanStatus';
 export * from './uploadedFileType';
-export * from './uploadFileBody';
-export * from './uploadFileBodyEdition';
-export * from './uploadFileBodyType';
 export * from './usernameCheck';

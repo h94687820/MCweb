@@ -4,9 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetFile,
+  useListFileVersions,
   useRescanFile,
   useDeleteFile,
+  getGetFileQueryKey,
   getListFilesQueryKey,
+  getListFileVersionsQueryKey,
+  getListMyFilesQueryKey,
   getGetFileStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useAppAuth } from "@/contexts/auth-context";
@@ -83,7 +87,7 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
     try {
       const formData = new FormData();
       files.forEach((f) => formData.append("images", f));
-      const res = await fetchWithAppAuth(`${base}/api/files/${fileId}`, {
+      const res = await fetchWithAppAuth(`${base}/api/files/${fileId}/metadata`, {
         method: "PATCH",
         body: formData,
       });
@@ -255,12 +259,14 @@ function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImag
 
 interface DescriptionEditorProps {
   fileId: number;
+  title: string;
+  customId: string;
   initialDescription: string | null | undefined;
   isOwner: boolean;
   onUpdated: () => void;
 }
 
-function DescriptionEditor({ fileId, initialDescription, isOwner, onUpdated }: DescriptionEditorProps) {
+function DescriptionEditor({ fileId, title, customId, initialDescription, isOwner, onUpdated }: DescriptionEditorProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialDescription ?? "");
   const [saving, setSaving] = useState(false);
@@ -269,11 +275,10 @@ function DescriptionEditor({ fileId, initialDescription, isOwner, onUpdated }: D
   async function handleSave() {
     setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append("description", value);
       const res = await fetchWithAppAuth(`${base}/api/files/${fileId}`, {
         method: "PATCH",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, customId, description: value }),
       });
       if (res.ok) {
         onUpdated();
@@ -354,6 +359,13 @@ export default function FileDetailPage() {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   const { data: file, isLoading, error, refetch } = useGetFile(fileId);
+  const versionsQueryId = file?.rootFileId ?? fileId;
+  const { data: versions = [], isLoading: versionsLoading } = useListFileVersions(versionsQueryId, {
+    query: {
+      enabled: !!file,
+      queryKey: getListFileVersionsQueryKey(versionsQueryId),
+    },
+  });
   const rescanMutation = useRescanFile();
   const deleteMutation = useDeleteFile();
 
@@ -380,6 +392,9 @@ export default function FileDetailPage() {
   function handleUpdated() {
     refetch();
     queryClient.invalidateQueries({ queryKey: getListFilesQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListMyFilesQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetFileQueryKey(fileId) });
+    queryClient.invalidateQueries({ queryKey: getListFileVersionsQueryKey(versionsQueryId) });
   }
 
   if (isLoading) {
@@ -417,6 +432,8 @@ export default function FileDetailPage() {
   const EditionIcon = file.edition === "java" ? Cpu : Pickaxe;
   const date = new Date(file.uploadedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const images = (file.images as string[] | null) ?? [];
+  const latestRelease = versions[0] ?? file;
+  const olderReleases = versions.filter((release) => release.id !== latestRelease.id);
 
   return (
     <div className="p-6 md:p-8 max-w-3xl">
@@ -473,6 +490,11 @@ export default function FileDetailPage() {
                 <EditionIcon className="w-3 h-3" />
                 {file.edition === "java" ? "Java Edition" : "Bedrock Edition"}
               </span>
+              {latestRelease.gameVersion && (
+                <span className="text-xs font-mono text-primary" data-testid="text-current-game-version">
+                  {t.fileDetail.gameVersionLabel}: {latestRelease.gameVersion}
+                </span>
+              )}
             </div>
           </div>
           {isOwner && (
@@ -531,7 +553,7 @@ export default function FileDetailPage() {
         {/* Cover image */}
         <CoverImageSection
           coverImage={file.coverImage}
-          fileId={file.id}
+          fileId={file.rootFileId}
           isOwner={isOwner}
           onUpdated={handleUpdated}
         />
@@ -539,7 +561,9 @@ export default function FileDetailPage() {
         {/* Description */}
         <div className="bg-card border border-card-border p-5">
           <DescriptionEditor
-            fileId={file.id}
+            fileId={file.rootFileId}
+            title={file.title || file.originalName}
+            customId={file.customId ?? ""}
             initialDescription={file.description}
             isOwner={isOwner}
             onUpdated={handleUpdated}
@@ -550,7 +574,7 @@ export default function FileDetailPage() {
         <div className="bg-card border border-card-border p-5">
           <ImageGallery
             images={images}
-            fileId={file.id}
+            fileId={file.rootFileId}
             isOwner={isOwner}
             onImagesUpdated={handleUpdated}
           />
@@ -576,6 +600,46 @@ export default function FileDetailPage() {
             </div>
           )}
         </div>
+
+        <section className="border border-border p-4 space-y-4" data-testid="section-version-history">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold">{t.fileDetail.versionHistoryTitle}</h2>
+            {latestRelease.gameVersion && (
+              <span className="text-xs font-mono text-primary">
+                {t.fileDetail.currentVersionLabel}: {latestRelease.gameVersion}
+              </span>
+            )}
+          </div>
+          {versionsLoading ? (
+            <p className="text-xs text-muted-foreground">{t.common.loading}</p>
+          ) : olderReleases.length > 0 ? (
+            <ul className="divide-y divide-border">
+              {olderReleases.map((release) => (
+                <li key={release.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold" data-testid={`text-release-version-${release.id}`}>
+                      {release.gameVersion || t.fileDetail.gameVersionLabel}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground" title={release.originalName}>
+                      {release.originalName}
+                    </p>
+                  </div>
+                  <a
+                    href={`${base}/api/files/${release.id}/download`}
+                    download={release.originalName}
+                    className="inline-flex shrink-0 items-center gap-2 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    data-testid={`button-download-release-${release.id}`}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {t.fileDetail.downloadVersionLabel}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t.fileDetail.noOlderVersionsLabel}</p>
+          )}
+        </section>
       </motion.div>
     </div>
   );

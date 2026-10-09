@@ -1,9 +1,17 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppAuth } from "@/contexts/auth-context";
-import { getListFilesQueryKey, getGetFileStatsQueryKey } from "@workspace/api-client-react";
+import {
+  getGetFileQueryKey,
+  getGetFileStatsQueryKey,
+  getListFilesQueryKey,
+  getListFileVersionsQueryKey,
+  getListMyFilesQueryKey,
+  useGetFile,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "@/hooks/use-navigate";
 import {
   Upload,
   Package,
@@ -35,6 +43,7 @@ type UploadResponsePayload = {
 };
 
 const CUSTOM_ID_REGEX = /^[a-z0-9-]{3,50}$/;
+const GAME_VERSION_REGEX = /^\d{1,8}(?:\.\d{1,8}){0,3}$/;
 const MAX_MAIN_FILE_SIZE = 100 * 1024 * 1024;
 const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_TOTAL_UPLOAD_SIZE = 100 * 1024 * 1024;
@@ -50,10 +59,28 @@ const EDITION_HINT: Record<Edition, string> = {
 
 export default function UploadPage() {
   const queryClient = useQueryClient();
-  const { isSignedIn, isLoaded, getToken } = useAppAuth();
+  const { isSignedIn, isLoaded, getToken, user } = useAppAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const versionOfValue = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("versionOf");
+  const versionOfNumber = versionOfValue ? Number(versionOfValue) : Number.NaN;
+  const isVersionUpload = Number.isSafeInteger(versionOfNumber) && versionOfNumber > 0;
+  const invalidVersionTarget = versionOfValue !== null && !isVersionUpload;
+  const { data: versionParent, isLoading: isVersionParentLoading } = useGetFile(
+    isVersionUpload ? versionOfNumber : 0,
+    {
+      query: {
+        enabled: isVersionUpload,
+        queryKey: getGetFileQueryKey(isVersionUpload ? versionOfNumber : 0),
+      },
+    },
+  );
   const [edition, setEdition] = useState<Edition>("java");
   const [fileType, setFileType] = useState<FileType>("mod");
+  const [gameVersion, setGameVersion] = useState("");
+  const [gameVersionError, setGameVersionError] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [titleError, setTitleError] = useState<string>("");
@@ -71,6 +98,15 @@ export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isVersionUpload || !versionParent) return;
+    setEdition(versionParent.edition);
+    setFileType(versionParent.type);
+    setTitle(versionParent.title ?? versionParent.originalName);
+    setCustomId(versionParent.customId ?? "");
+    setDescription(versionParent.description ?? "");
+  }, [isVersionUpload, versionParent]);
 
   function selectedUploadBytes(mainFile = selectedFile, cover = coverImage, images = selectedImages) {
     return (mainFile?.size ?? 0) + (cover?.size ?? 0) + images.reduce((total, image) => total + image.size, 0);
@@ -108,6 +144,15 @@ export default function UploadPage() {
       setTitleError("Title is required");
       return false;
     }
+    return true;
+  }
+
+  function validateGameVersion(): boolean {
+    if (!GAME_VERSION_REGEX.test(gameVersion.trim())) {
+      setGameVersionError(t.upload.gameVersionError);
+      return false;
+    }
+    setGameVersionError("");
     return true;
   }
 
@@ -191,8 +236,8 @@ export default function UploadPage() {
 
   async function handleUpload() {
     if (!selectedFile || uploadInProgressRef.current) return;
-    if (!validateTitle()) return;
-    if (!validateCustomId()) return;
+    if (!validateGameVersion()) return;
+    if (!isVersionUpload && (!validateTitle() || !validateCustomId())) return;
 
     uploadInProgressRef.current = true;
     setUploadProgress(0);
@@ -203,17 +248,20 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      formData.append("title", title.trim());
-      formData.append("type", fileType);
-      formData.append("edition", edition);
-      formData.append("customId", customId);
-      if (description.trim()) {
-        formData.append("description", description.trim());
+      formData.append("gameVersion", gameVersion.trim());
+      if (!isVersionUpload) {
+        formData.append("title", title.trim());
+        formData.append("type", fileType);
+        formData.append("edition", edition);
+        formData.append("customId", customId);
+        if (description.trim()) {
+          formData.append("description", description.trim());
+        }
+        if (coverImage) {
+          formData.append("coverImage", coverImage);
+        }
+        selectedImages.forEach((img) => formData.append("images", img));
       }
-      if (coverImage) {
-        formData.append("coverImage", coverImage);
-      }
-      selectedImages.forEach((img) => formData.append("images", img));
 
       const authToken = await getToken();
       if (!authToken) {
@@ -223,7 +271,12 @@ export default function UploadPage() {
       const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       const response = await new Promise<Response>((resolve, reject) => {
         const request = new XMLHttpRequest();
-        request.open("POST", `${base}/api/files/upload`);
+        request.open(
+          "POST",
+          isVersionUpload
+            ? `${base}/api/files/${versionOfNumber}/versions`
+            : `${base}/api/files/upload`,
+        );
         request.setRequestHeader("Authorization", `Bearer ${authToken}`);
         request.upload.addEventListener("progress", (event) => {
           if (event.lengthComputable) {
@@ -245,7 +298,7 @@ export default function UploadPage() {
       const data = await response.json().catch(() => ({})) as UploadResponsePayload;
       if (!response.ok) {
         const errMsg = data.error ?? `Upload failed (${response.status})`;
-        if (response.status === 409 || errMsg.toLowerCase().includes("taken")) {
+        if (!isVersionUpload && (response.status === 409 || errMsg.toLowerCase().includes("taken"))) {
           setCustomIdError(t.upload.customIdTaken);
           setUploadState("idle");
           return;
@@ -269,14 +322,25 @@ export default function UploadPage() {
       setUploadState("success");
       queryClient.invalidateQueries({ queryKey: getListFilesQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetFileStatsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListMyFilesQueryKey() });
+      if (isVersionUpload) {
+        queryClient.invalidateQueries({ queryKey: getListFileVersionsQueryKey(versionOfNumber) });
+        queryClient.invalidateQueries({ queryKey: getGetFileQueryKey(versionOfNumber) });
+      }
 
       setTimeout(() => {
+        if (isVersionUpload) {
+          navigate("/library");
+          return;
+        }
         setSelectedFile(null);
         setTitle("");
         setTitleError("");
         setCustomId("");
         setCustomIdError("");
         setDescription("");
+        setGameVersion("");
+        setGameVersionError("");
         setCoverImage(null);
         setSelectedImages([]);
         setUploadState("idle");
@@ -306,8 +370,8 @@ export default function UploadPage() {
     selectedImages.every((image) => image.size <= MAX_IMAGE_FILE_SIZE) &&
     (!coverImage || coverImage.size <= MAX_IMAGE_FILE_SIZE) &&
     selectedUploadBytes() <= MAX_TOTAL_UPLOAD_SIZE &&
-    !!title.trim() &&
-    customIdValid &&
+    GAME_VERSION_REGEX.test(gameVersion.trim()) &&
+    (isVersionUpload || (!!title.trim() && customIdValid)) &&
     uploadState !== "uploading" &&
     uploadState !== "success";
 
@@ -339,16 +403,53 @@ export default function UploadPage() {
     );
   }
 
+  if (isVersionUpload && isVersionParentLoading) {
+    return <div className="p-6 md:p-8 text-sm text-muted-foreground">{t.common.loading}</div>;
+  }
+
+  if (
+    invalidVersionTarget ||
+    (isVersionUpload && (!versionParent || versionParent.uploadedBy !== user?.id))
+  ) {
+    const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+    return (
+      <div className="p-6 md:p-8 max-w-2xl">
+        <div className="border border-border bg-card p-6">
+          <h1 className="text-xl font-bold">{t.upload.versionSourceUnavailable}</h1>
+          <a href={`${basePath}/library`} className="mt-4 inline-flex px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold">
+            {t.upload.backToLibrary}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 md:p-8 max-w-2xl">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">{t.upload.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.upload.subtitle}</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {isVersionUpload ? t.upload.versionUploadTitle : t.upload.title}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isVersionUpload ? t.upload.versionUploadSubtitle : t.upload.subtitle}
+        </p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="space-y-6">
+        {isVersionUpload && versionParent && (
+          <div className="border border-primary/30 bg-primary/5 p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">{t.upload.versionFor}</p>
+            <p className="mt-1 font-semibold">{versionParent.title || versionParent.originalName}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {versionParent.edition === "java" ? t.upload.javaEdition : t.upload.bedrockEdition}
+              {" · "}
+              {versionParent.type === "mod" ? t.upload.mod : t.upload.map}
+            </p>
+          </div>
+        )}
+
         {/* Step 1: Edition */}
-        <div>
+        {!isVersionUpload && <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{t.upload.stepEdition}</p>
           <div className="grid grid-cols-2 gap-3">
             {([
@@ -369,10 +470,10 @@ export default function UploadPage() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Step 2: Type */}
-        <div>
+        {!isVersionUpload && <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{t.upload.stepType}</p>
           <div className="grid grid-cols-2 gap-3">
             {([
@@ -393,6 +494,40 @@ export default function UploadPage() {
               </button>
             ))}
           </div>
+        </div>}
+
+        <div>
+          <label htmlFor="game-version" className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+            {t.upload.gameVersionLabel}
+            <span className="text-red-400 ml-1" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="game-version"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            value={gameVersion}
+            onChange={(event) => {
+              setGameVersion(event.target.value);
+              setGameVersionError("");
+            }}
+            onBlur={validateGameVersion}
+            placeholder={t.upload.gameVersionPlaceholder}
+            maxLength={32}
+            aria-invalid={!!gameVersionError}
+            data-testid="input-game-version"
+            className={cn(
+              "w-full bg-card border text-sm text-foreground placeholder:text-muted-foreground px-3 py-3 focus:outline-none transition-colors",
+              gameVersionError ? "border-red-500/60 focus:border-red-500" : "border-border focus:border-primary/60",
+            )}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">{t.upload.gameVersionHint}</p>
+          {gameVersionError && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-red-400" role="alert">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+              {gameVersionError}
+            </p>
+          )}
         </div>
 
         {/* Step 3: File */}
@@ -451,6 +586,8 @@ export default function UploadPage() {
           </p>
         </div>
 
+        {!isVersionUpload && (
+          <>
         {/* Step 3.5: Title */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Title</p>
@@ -606,6 +743,8 @@ export default function UploadPage() {
           <p className="text-xs text-muted-foreground mt-2 font-mono">JPG · PNG · GIF · WebP · max 10 MB each</p>
           <p className="text-xs text-muted-foreground mt-1">{t.upload.totalSizeLimit}</p>
         </div>
+          </>
+        )}
 
         <AnimatePresence>
           {uploadState === "success" && (

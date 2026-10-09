@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AddFileVersionBody = {
+export interface FileVersionUploadInput {
   file: Blob | File;
   /**
      * @maxLength 32
-     * @pattern ^\d+(\.\d+){0,3}$
+     * @pattern ^\d{1,8}(\.\d{1,8}){0,3}$
      */
   gameVersion: string;
-};
+}

@@ -5,15 +5,15 @@
  * Minecraft Mods & Maps Hub API
  * OpenAPI spec version: 0.1.0
  */
-import type { UploadFileBodyEdition } from './uploadFileBodyEdition';
-import type { UploadFileBodyType } from './uploadFileBodyType';
+import type { FileUploadInputEdition } from './fileUploadInputEdition';
+import type { FileUploadInputType } from './fileUploadInputType';
 
-export type UploadFileBody = {
+export interface FileUploadInput {
   file: Blob | File;
   /** @maxLength 100 */
   title: string;
-  type: UploadFileBodyType;
-  edition: UploadFileBodyEdition;
+  type: FileUploadInputType;
+  edition: FileUploadInputEdition;
   /**
      * @minLength 3
      * @maxLength 50
@@ -22,11 +22,11 @@ export type UploadFileBody = {
   customId: string;
   /**
      * @maxLength 32
-     * @pattern ^\d+(\.\d+){0,3}$
+     * @pattern ^\d{1,8}(\.\d{1,8}){0,3}$
      */
   gameVersion: string;
   /** @maxLength 2000 */
   description?: string;
   coverImage?: Blob | File;
   images?: (Blob | File)[];
-};
+}

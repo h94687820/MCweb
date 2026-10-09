@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { randomUUID } from "crypto";
 import { Readable, Transform } from "stream";
 import { ListFilesQueryParams, GetFileParams, DeleteFileParams } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
@@ -159,14 +160,74 @@ type FileData = {
   images: string[];               // download URLs
   imageFileIds: number[];
   uploadedBy: string | null;
+  gameVersion?: string | null;
+  versionGroupId?: string | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function fileToResponse(record: { id: number; data: FileData }) {
+type FileRecord = { id: number; data: FileData };
+const GAME_VERSION_REGEX = /^\d{1,8}(?:\.\d{1,8}){0,3}$/;
+
+function releaseGroupKey(record: FileRecord): string {
+  return record.data.versionGroupId || `legacy-${record.id}`;
+}
+
+function compareGameVersions(a: string | null | undefined, b: string | null | undefined): number {
+  if (!a) return b ? -1 : 0;
+  if (!b) return 1;
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function newestFirst(a: FileRecord, b: FileRecord): number {
+  return compareGameVersions(b.data.gameVersion, a.data.gameVersion)
+    || new Date(b.data.uploadedAt).getTime() - new Date(a.data.uploadedAt).getTime()
+    || b.id - a.id;
+}
+
+function rootRecord(records: FileRecord[]): FileRecord | undefined {
+  return [...records].sort((a, b) =>
+    new Date(a.data.uploadedAt).getTime() - new Date(b.data.uploadedAt).getTime() || a.id - b.id,
+  )[0];
+}
+
+function latestRecords(records: FileRecord[]): FileRecord[] {
+  const groups = new Map<string, FileRecord[]>();
+  for (const record of records) {
+    const key = releaseGroupKey(record);
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  }
+  return [...groups.values()].map((group) => [...group].sort(newestFirst)[0]);
+}
+
+function fileToResponse(record: FileRecord, allRecords: FileRecord[] = [record]) {
   // Never expose the public BaaS URL for the main file: it would bypass the
   // File download proxy. VirusTotal status is informational while the scanner is under maintenance.
-  const { mainStorageFileId, coverImageFileId, imageFileIds, filePath, ...rest } = record.data;
-  return { id: record.id, ...rest, name: record.data.originalName };
+  const groupKey = releaseGroupKey(record);
+  const group = allRecords.filter((candidate) => releaseGroupKey(candidate) === groupKey);
+  const root = rootRecord(group) ?? record;
+  const canonicalData = {
+    ...record.data,
+    customId: root.data.customId,
+    title: root.data.title,
+    description: root.data.description,
+    coverImage: root.data.coverImage,
+    images: Array.isArray(root.data.images) ? root.data.images : [],
+  };
+  const { mainStorageFileId, coverImageFileId, imageFileIds, filePath, ...rest } = canonicalData;
+  return {
+    id: record.id,
+    ...rest,
+    name: record.data.originalName,
+    gameVersion: record.data.gameVersion ?? null,
+    versionGroupId: groupKey,
+    rootFileId: root.id,
+  };
 }
 
 const DOWNLOAD_MIME_TYPES: Record<string, string> = {
@@ -304,39 +365,64 @@ router.get("/files", async (req, res) => {
     edition?: string; type?: string; scanStatus?: string; search?: string;
   };
 
-  let results = await listRecords<FileData>(COLLECTION);
-  if (edition) results = results.filter((r) => r.data.edition === edition);
-  if (type) results = results.filter((r) => r.data.type === type);
-  if (scanStatus) results = results.filter((r) => r.data.scanStatus === scanStatus);
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  let results = latestRecords(allRecords).map((record) => fileToResponse(record, allRecords));
+  if (edition) results = results.filter((r) => r.edition === edition);
+  if (type) results = results.filter((r) => r.type === type);
+  if (scanStatus) results = results.filter((r) => r.scanStatus === scanStatus);
   if (search && search.trim()) {
     const term = search.trim().toLowerCase();
     results = results.filter(
       (r) =>
-        r.data.originalName.toLowerCase().includes(term) ||
-        (r.data.customId ?? "").toLowerCase().includes(term),
+        r.originalName.toLowerCase().includes(term) ||
+        (r.customId ?? "").toLowerCase().includes(term) ||
+        (r.title ?? "").toLowerCase().includes(term),
     );
   }
-  results.sort((a, b) => new Date(a.data.uploadedAt).getTime() - new Date(b.data.uploadedAt).getTime());
+  results.sort((a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime());
 
-  return res.json(results.map(fileToResponse));
+  return res.json(results);
 });
 
 // ── Stats — MUST be before /:id ──────────────────────────────────────────────
 router.get("/files/stats", async (_req, res) => {
   const rows = await listRecords<FileData>(COLLECTION);
+  const products = latestRecords(rows);
   return res.json({
     totalFiles: rows.length,
-    totalMods: rows.filter((r) => r.data.type === "mod").length,
-    totalMaps: rows.filter((r) => r.data.type === "map").length,
-    javaMods: rows.filter((r) => r.data.edition === "java" && r.data.type === "mod").length,
-    javaMaps: rows.filter((r) => r.data.edition === "java" && r.data.type === "map").length,
-    bedrockMods: rows.filter((r) => r.data.edition === "bedrock" && r.data.type === "mod").length,
-    bedrockMaps: rows.filter((r) => r.data.edition === "bedrock" && r.data.type === "map").length,
+    totalMods: products.filter((r) => r.data.type === "mod").length,
+    totalMaps: products.filter((r) => r.data.type === "map").length,
+    javaMods: products.filter((r) => r.data.edition === "java" && r.data.type === "mod").length,
+    javaMaps: products.filter((r) => r.data.edition === "java" && r.data.type === "map").length,
+    bedrockMods: products.filter((r) => r.data.edition === "bedrock" && r.data.type === "mod").length,
+    bedrockMaps: products.filter((r) => r.data.edition === "bedrock" && r.data.type === "map").length,
     cleanFiles: rows.filter((r) => r.data.scanStatus === "clean").length,
     maliciousFiles: rows.filter((r) => r.data.scanStatus === "malicious").length,
     pendingFiles: rows.filter((r) => r.data.scanStatus === "pending").length,
     totalSizeBytes: rows.reduce((acc, r) => acc + (r.data.size ?? 0), 0),
   });
+});
+
+router.get("/files/mine", requireAuth, async (req, res) => {
+  const userId = (req as any).userId as string;
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  const mine = allRecords
+    .filter((record) => record.data.uploadedBy === userId)
+    .sort((a, b) => new Date(b.data.uploadedAt).getTime() - new Date(a.data.uploadedAt).getTime());
+  return res.json(mine.map((record) => fileToResponse(record, allRecords)));
+});
+
+router.get("/files/:id/versions", async (req, res) => {
+  const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
+  if (!parseResult.success) return res.status(400).json({ error: "Invalid id" });
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  const requested = allRecords.find((record) => record.id === parseResult.data.id);
+  if (!requested) return res.status(404).json({ error: "Not found" });
+  const groupKey = releaseGroupKey(requested);
+  const versions = allRecords
+    .filter((record) => releaseGroupKey(record) === groupKey)
+    .sort(newestFirst);
+  return res.json(versions.map((record) => fileToResponse(record, allRecords)));
 });
 
 // ── Upload ────────────────────────────────────────────────────────────────────
@@ -371,7 +457,7 @@ router.post(
 
     try {
       await ensureSchema();
-      const { type, edition, description, customId, title } = req.body as Record<string, unknown>;
+      const { type, edition, description, customId, title, gameVersion } = req.body as Record<string, unknown>;
 
       if (typeof type !== "string" || !["mod", "map"].includes(type)) {
         cleanupTmp();
@@ -398,6 +484,10 @@ router.post(
       if (description !== undefined && (typeof description !== "string" || description.length > 2000)) {
         cleanupTmp();
         return res.status(400).json({ error: "description must be 2,000 characters or fewer" });
+      }
+      if (typeof gameVersion !== "string" || gameVersion.trim().length > 32 || !GAME_VERSION_REGEX.test(gameVersion.trim())) {
+        cleanupTmp();
+        return res.status(400).json({ error: "gameVersion must be a numeric Minecraft version such as 1.20.4 or 26.2" });
       }
 
       const ext = path.extname(mainFile.originalname).toLowerCase();
@@ -470,6 +560,8 @@ router.post(
         filePath: mainResult.downloadUrl,
         mainStorageFileId: mainResult.fileId,
         uploadedAt: new Date().toISOString(),
+        gameVersion: gameVersion.trim(),
+        versionGroupId: randomUUID(),
         scanStatus: "pending",
         scanDetails: null,
         scanEngine: null,
@@ -534,13 +626,159 @@ router.post(
   },
 );
 
+// ── Add a release to an existing file ────────────────────────────────────────
+router.post(
+  "/files/:id/versions",
+  requireAuth,
+  multipartFields(upload, [{ name: "file", maxCount: 1 }]),
+  async (req, res) => {
+    const userId = (req as any).userId as string;
+    const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
+    const fields = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const mainFile = fields?.["file"]?.[0];
+    const gameVersion = req.body?.gameVersion;
+    const uploadedStorageFileIds: number[] = [];
+    let insertedRecordId: number | null = null;
+
+    function cleanupTmp() {
+      if (mainFile && fs.existsSync(mainFile.path)) fs.unlinkSync(mainFile.path);
+    }
+
+    if (!parseResult.success) {
+      cleanupTmp();
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!mainFile) {
+      cleanupTmp();
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    if (typeof gameVersion !== "string" || gameVersion.trim().length > 32 || !GAME_VERSION_REGEX.test(gameVersion.trim())) {
+      cleanupTmp();
+      return res.status(400).json({ error: "gameVersion must be a numeric Minecraft version such as 1.20.4 or 26.2" });
+    }
+
+    try {
+      await ensureSchema();
+      const allRecords = await listRecords<FileData>(COLLECTION);
+      const requested = allRecords.find((record) => record.id === parseResult.data.id);
+      if (!requested) {
+        cleanupTmp();
+        return res.status(404).json({ error: "Not found" });
+      }
+      if (requested.data.uploadedBy !== userId) {
+        cleanupTmp();
+        return res.status(403).json({ error: "Forbidden — you can only add releases to your own files" });
+      }
+
+      const groupKey = releaseGroupKey(requested);
+      const group = allRecords.filter((record) => releaseGroupKey(record) === groupKey);
+      const root = rootRecord(group) ?? requested;
+      if (root.data.uploadedBy !== userId) {
+        cleanupTmp();
+        return res.status(403).json({ error: "Forbidden — you can only add releases to your own files" });
+      }
+      if (group.some((record) => compareGameVersions(record.data.gameVersion, gameVersion.trim()) === 0)) {
+        cleanupTmp();
+        return res.status(409).json({ error: "A release for this game version already exists" });
+      }
+
+      const ext = path.extname(mainFile.originalname).toLowerCase();
+      if (!getAllowedExtensions(root.data.edition).has(ext)) {
+        cleanupTmp();
+        return res.status(400).json({
+          error: `${root.data.edition === "java" ? "Java" : "Bedrock"} Edition does not accept ${ext || "this"} files`,
+        });
+      }
+      if (!hasZipContainerSignature(readFilePrefix(mainFile.path, 4))) {
+        cleanupTmp();
+        return res.status(400).json({ error: "The uploaded file is not a valid ZIP-based Minecraft archive" });
+      }
+
+      const stored = await uploadTmpToBaas(mainFile, "files");
+      uploadedStorageFileIds.push(stored.fileId);
+      const normalizedGroupId = root.data.versionGroupId || `legacy-${root.id}`;
+      let responseRecords = allRecords;
+      if (!root.data.versionGroupId) {
+        const normalizedRoot = await patchRecord<FileData>(COLLECTION, root.id, {
+          versionGroupId: normalizedGroupId,
+        });
+        responseRecords = allRecords.map((record) => record.id === root.id ? normalizedRoot : record);
+      }
+
+      const inserted = await createRecord<FileData>(COLLECTION, {
+        customId: `release-${randomUUID()}`,
+        name: stored.downloadUrl,
+        originalName: mainFile.originalname,
+        title: root.data.title,
+        edition: root.data.edition,
+        type: root.data.type,
+        size: mainFile.size,
+        mimeType: DOWNLOAD_MIME_TYPES[ext] ?? "application/octet-stream",
+        filePath: stored.downloadUrl,
+        mainStorageFileId: stored.fileId,
+        uploadedAt: new Date().toISOString(),
+        gameVersion: gameVersion.trim(),
+        versionGroupId: normalizedGroupId,
+        scanStatus: "pending",
+        scanDetails: null,
+        scanEngine: null,
+        virusTotalLink: null,
+        detectionRatio: null,
+        description: root.data.description,
+        coverImage: null,
+        coverImageFileId: null,
+        images: [],
+        imageFileIds: [],
+        uploadedBy: userId,
+      });
+      insertedRecordId = inserted.id;
+
+      let responseRecord = inserted;
+      const vtKey = process.env.VIRUSTOTAL_API_KEY;
+      if (vtKey) {
+        performScan(inserted.id, stored.downloadUrl, mainFile.size, vtKey).catch(async (err) => {
+          const msg = String(err);
+          const isRateLimit = msg.includes("rate") || msg.includes("429");
+          logger.error({ fileId: inserted.id, err: msg }, "VirusTotal scan failed");
+          await patchRecord<FileData>(COLLECTION, inserted.id, {
+            scanStatus: "error",
+            scanDetails: isRateLimit ? "Rate limited — needs manual rescan" : msg,
+          }).catch(() => {});
+        });
+      } else {
+        responseRecord = await patchRecord<FileData>(COLLECTION, inserted.id, {
+          scanStatus: "error",
+          scanDetails: "VirusTotal API key not configured — file unverified",
+        });
+      }
+
+      return res.status(201).json(fileToResponse(responseRecord, [...responseRecords, responseRecord]));
+    } catch (err: any) {
+      cleanupTmp();
+      if (insertedRecordId !== null) {
+        await deleteRecord(COLLECTION, insertedRecordId).catch(() => {});
+      }
+      for (const storageId of uploadedStorageFileIds) {
+        await deleteStorageFile(storageId).catch(() => {});
+      }
+      logger.error({ fileId: parseResult.data.id, err: err?.message }, "Version upload failed");
+      if (isDuplicateFieldError(err)) {
+        return res.status(409).json({ error: "A release for this game version already exists" });
+      }
+      if (err instanceof BaasError) return res.status(502).json({ error: "Storage service unavailable" });
+      return res.status(err?.status ?? 500).json({ error: err?.message ?? "Version upload failed" });
+    }
+  },
+);
+
 // ── Rescan ────────────────────────────────────────────────────────────────────
 router.post("/files/:id/scan", requireAuth, async (req, res) => {
   const userId = (req as any).userId as string;
   const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
   if (!parseResult.success) return res.status(400).json({ error: "Invalid id" });
 
-  const file = await getRecord<FileData>(COLLECTION, parseResult.data.id);
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  const file = allRecords.find((record) => record.id === parseResult.data.id);
   if (!file) return res.status(404).json({ error: "Not found" });
   if (file.data.uploadedBy !== userId) return res.status(403).json({ error: "Forbidden — you can only rescan your own files" });
   if (!["pending", "error"].includes(file.data.scanStatus)) {
@@ -551,6 +789,7 @@ router.post("/files/:id/scan", requireAuth, async (req, res) => {
   if (!vtKey) return res.status(503).json({ error: "VirusTotal API key not configured" });
 
   const updated = await patchRecord<FileData>(COLLECTION, file.id, { scanStatus: "scanning", scanDetails: null });
+  const responseRecords = allRecords.map((record) => record.id === updated.id ? updated : record);
 
   performScan(file.id, file.data.filePath, file.data.size, vtKey).catch(async (err) => {
     const msg = String(err);
@@ -562,7 +801,7 @@ router.post("/files/:id/scan", requireAuth, async (req, res) => {
     }).catch(() => {});
   });
 
-  return res.status(202).json(fileToResponse(updated));
+  return res.status(202).json(fileToResponse(updated, responseRecords));
 });
 
 // ── Update metadata + images ──────────────────────────────────────────────────
@@ -676,6 +915,56 @@ router.patch(
   },
 );
 
+router.patch("/files/:id/metadata", requireAuth, async (req, res) => {
+  const userId = (req as any).userId as string;
+  const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
+  if (!parseResult.success) return res.status(400).json({ error: "Invalid id" });
+
+  const body = req.body as { title?: unknown; customId?: unknown; description?: unknown } | undefined;
+  if (
+    typeof body?.title !== "string" ||
+    !body.title.trim() ||
+    body.title.length > 100 ||
+    typeof body.customId !== "string" ||
+    !/^[a-z0-9-]{3,50}$/.test(body.customId.trim()) ||
+    typeof body.description !== "string" ||
+    body.description.length > 2000
+  ) {
+    return res.status(400).json({ error: "Invalid title, custom ID, or description" });
+  }
+
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  const requested = allRecords.find((record) => record.id === parseResult.data.id);
+  if (!requested) return res.status(404).json({ error: "Not found" });
+  if (requested.data.uploadedBy !== userId) {
+    return res.status(403).json({ error: "Forbidden — you can only edit your own files" });
+  }
+  const groupKey = releaseGroupKey(requested);
+  const root = rootRecord(allRecords.filter((record) => releaseGroupKey(record) === groupKey)) ?? requested;
+  if (root.data.uploadedBy !== userId) {
+    return res.status(403).json({ error: "Forbidden — you can only edit your own files" });
+  }
+
+  try {
+    const updated = await patchRecord<FileData>(COLLECTION, root.id, {
+      title: body.title.trim(),
+      customId: body.customId.trim(),
+      description: body.description.trim() || null,
+    });
+    const responseRecords = allRecords.map((record) => record.id === updated.id ? updated : record);
+    return res.json(fileToResponse(updated, responseRecords));
+  } catch (error) {
+    if (isDuplicateFieldError(error)) {
+      return res.status(409).json({ error: "This custom ID is already taken" });
+    }
+    if (error instanceof BaasError) {
+      return res.status(502).json({ error: "Storage service unavailable" });
+    }
+    logger.error({ fileId: root.id, err: String(error) }, "File metadata update failed");
+    return res.status(500).json({ error: "Metadata update failed" });
+  }
+});
+
 // ── Download — proxy from BaaS to preserve Content-Disposition for Safari ─────
 router.get("/files/:id/download", async (req, res) => {
   const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
@@ -713,10 +1002,11 @@ router.get("/files/:id", async (req, res) => {
   const parseResult = GetFileParams.safeParse({ id: Number(req.params.id) });
   if (!parseResult.success) return res.status(400).json({ error: "Invalid id" });
 
-  const file = await getRecord<FileData>(COLLECTION, parseResult.data.id);
+  const allRecords = await listRecords<FileData>(COLLECTION);
+  const file = allRecords.find((record) => record.id === parseResult.data.id);
   if (!file) return res.status(404).json({ error: "Not found" });
 
-  return res.json(fileToResponse(file));
+  return res.json(fileToResponse(file, allRecords));
 });
 
 // ── Delete file ───────────────────────────────────────────────────────────────

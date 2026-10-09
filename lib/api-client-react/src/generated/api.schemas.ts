@@ -90,6 +90,54 @@ export interface FileMetadataInput {
   description: string;
 }
 
+export type FileUploadInputType = typeof FileUploadInputType[keyof typeof FileUploadInputType];
+
+
+export const FileUploadInputType = {
+  mod: 'mod',
+  map: 'map',
+} as const;
+
+export type FileUploadInputEdition = typeof FileUploadInputEdition[keyof typeof FileUploadInputEdition];
+
+
+export const FileUploadInputEdition = {
+  java: 'java',
+  bedrock: 'bedrock',
+} as const;
+
+export interface FileUploadInput {
+  file: Blob | File;
+  /** @maxLength 100 */
+  title: string;
+  type: FileUploadInputType;
+  edition: FileUploadInputEdition;
+  /**
+     * @minLength 3
+     * @maxLength 50
+     * @pattern ^[a-z0-9-]+$
+     */
+  customId: string;
+  /**
+     * @maxLength 32
+     * @pattern ^\d{1,8}(\.\d{1,8}){0,3}$
+     */
+  gameVersion: string;
+  /** @maxLength 2000 */
+  description?: string;
+  coverImage?: Blob | File;
+  images?: (Blob | File)[];
+}
+
+export interface FileVersionUploadInput {
+  file: Blob | File;
+  /**
+     * @maxLength 32
+     * @pattern ^\d{1,8}(\.\d{1,8}){0,3}$
+     */
+  gameVersion: string;
+}
+
 export interface FileStats {
   totalFiles: number;
   totalMods: number;
@@ -214,54 +262,6 @@ export const ListFilesScanStatus = {
   malicious: 'malicious',
   error: 'error',
 } as const;
-
-export type UploadFileBodyType = typeof UploadFileBodyType[keyof typeof UploadFileBodyType];
-
-
-export const UploadFileBodyType = {
-  mod: 'mod',
-  map: 'map',
-} as const;
-
-export type UploadFileBodyEdition = typeof UploadFileBodyEdition[keyof typeof UploadFileBodyEdition];
-
-
-export const UploadFileBodyEdition = {
-  java: 'java',
-  bedrock: 'bedrock',
-} as const;
-
-export type UploadFileBody = {
-  file: Blob | File;
-  /** @maxLength 100 */
-  title: string;
-  type: UploadFileBodyType;
-  edition: UploadFileBodyEdition;
-  /**
-     * @minLength 3
-     * @maxLength 50
-     * @pattern ^[a-z0-9-]+$
-     */
-  customId: string;
-  /**
-     * @maxLength 32
-     * @pattern ^\d+(\.\d+){0,3}$
-     */
-  gameVersion: string;
-  /** @maxLength 2000 */
-  description?: string;
-  coverImage?: Blob | File;
-  images?: (Blob | File)[];
-};
-
-export type AddFileVersionBody = {
-  file: Blob | File;
-  /**
-     * @maxLength 32
-     * @pattern ^\d+(\.\d+){0,3}$
-     */
-  gameVersion: string;
-};
 
 export type CheckUsernameParams = {
 username: string;

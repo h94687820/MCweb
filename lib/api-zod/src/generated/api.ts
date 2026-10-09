@@ -96,7 +96,7 @@ export const uploadFileBodyCustomIdRegExp = new RegExp('^[a-z0-9-]+$');
 export const uploadFileBodyGameVersionMax = 32;
 
 
-export const uploadFileBodyGameVersionRegExp = new RegExp('^\\d+(\\.\\d+){0,3}$');
+export const uploadFileBodyGameVersionRegExp = new RegExp('^\\d{1,8}(\\.\\d{1,8}){0,3}$');
 export const uploadFileBodyDescriptionMax = 2000;
 
 
@@ -276,7 +276,7 @@ export const AddFileVersionParams = zod.object({
 export const addFileVersionBodyGameVersionMax = 32;
 
 
-export const addFileVersionBodyGameVersionRegExp = new RegExp('^\\d+(\\.\\d+){0,3}$');
+export const addFileVersionBodyGameVersionRegExp = new RegExp('^\\d{1,8}(\\.\\d{1,8}){0,3}$');
 
 
 export const AddFileVersionBody = zod.object({

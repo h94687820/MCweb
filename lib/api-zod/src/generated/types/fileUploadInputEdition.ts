@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UploadFileBodyEdition = typeof UploadFileBodyEdition[keyof typeof UploadFileBodyEdition];
+export type FileUploadInputEdition = typeof FileUploadInputEdition[keyof typeof FileUploadInputEdition];
 
 
-export const UploadFileBodyEdition = {
+export const FileUploadInputEdition = {
   java: 'java',
   bedrock: 'bedrock',
 } as const;

@@ -1,6 +1,7 @@
 - [BaaS migration](baas-migration.md) — BaaS is sole data+storage backend; collections, upload flow, image URL handling, unique fields, and known limits documented
 - [Replit Auth lib tsconfig](replit-auth-lib.md) — composite lib needs specific fixes; import.meta.env and workspace dep pitfalls documented
 - [Firebase authentication](firebase-auth-cutover.md) — Firebase is the sole sign-in provider; protected requests use Firebase ID tokens
+- [Firebase web config alignment](firebase-web-config-alignment.md) — Compare all client config values as one app; a mismatch alone does not show which value is wrong
 - [Secrets can go empty in shells](cloudflare-token-shell-access.md) — any secret can show empty in ShellExec despite existing; re-request via requestSecrets before assuming a block
 - [Missing avatar upload route symptom](avatar-upload-route.md) — a "shows in one place, not elsewhere" bug can mean the persist endpoint 404s while local state still renders
 - [Security scanning availability](security-scanning-availability.md) — DeepSeek is not approved; failed DeepAI moderation may bypass new uploads only with a visible warning

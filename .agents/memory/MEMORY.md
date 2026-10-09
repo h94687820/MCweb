@@ -6,3 +6,4 @@
 - [Missing avatar upload route symptom](avatar-upload-route.md) — a "shows in one place, not elsewhere" bug can mean the persist endpoint 404s while local state still renders
 - [Security scanning availability](security-scanning-availability.md) — DeepSeek is not approved; failed DeepAI moderation may bypass new uploads only with a visible warning
 - [Replit Git history](replit-git-history.md) — local branch cleanup does not remove Replit's managed agent ledger or alter remote history
+- [GitHub connection state mismatch](github-integration-state.md) — an authorized connection can remain `not_added` while Git CLI access fails; verify repository reads before any push

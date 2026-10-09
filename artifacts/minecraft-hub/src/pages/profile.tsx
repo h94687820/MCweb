@@ -79,11 +79,28 @@ export default function ProfilePage() {
         body: fd,
       });
       const data = await resp.json() as { url?: string; error?: string };
-      if (!resp.ok) throw new Error(data.error ?? "Upload failed");
+      if (!resp.ok) {
+        const message = (data.error ?? "").toLowerCase();
+        if (message.includes("5 mb")) throw new Error(t.profile.avatarTooLarge);
+        if (resp.status === 400 || message.includes("file type") || message.includes("invalid avatar")) {
+          throw new Error(t.profile.avatarInvalid);
+        }
+        throw new Error(t.profile.avatarUploadFailed);
+      }
       setAvatarUrl(data.url!);
       qc.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
     } catch (e: unknown) {
-      setAvatarError(e instanceof Error ? e.message : "Upload failed");
+      const message = e instanceof Error ? e.message : "";
+      const avatarErrors: string[] = [
+        t.profile.avatarTooLarge,
+        t.profile.avatarInvalid,
+        t.profile.avatarUploadFailed,
+      ];
+      setAvatarError(
+        avatarErrors.includes(message)
+          ? message
+          : t.profile.avatarUploadFailed,
+      );
     } finally {
       setAvatarUploading(false);
     }
@@ -100,12 +117,8 @@ export default function ProfilePage() {
           setTimeout(() => setSaved(false), 2000);
           initialized.current = false;
         },
-        onError: async (err: unknown) => {
-          const msg =
-            err && typeof err === "object" && "message" in err
-              ? String((err as { message: unknown }).message)
-              : "Failed to save";
-          setSaveError(msg);
+        onError: () => {
+          setSaveError(t.profile.saveError);
         },
       },
     );
@@ -162,7 +175,7 @@ export default function ProfilePage() {
               {avatarUploading ? (
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               ) : avatarSrc ? (
-                <img src={avatarSrc} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={avatarSrc} alt={t.profile.avatarAlt} className="w-full h-full object-cover" />
               ) : (
                 <User className="w-8 h-8 text-muted-foreground" />
               )}
@@ -170,6 +183,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => avatarInputRef.current?.click()}
+              aria-label={t.profile.avatarButtonLabel}
               disabled={avatarUploading}
               className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
             >

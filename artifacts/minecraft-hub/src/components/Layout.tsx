@@ -45,7 +45,7 @@ export default function Layout({ children }: LayoutProps) {
   const avatarSrc = profile?.avatarUrl || user?.imageUrl;
   const displayLabel =
     profile?.displayName ||
-    (profile?.username ? `@${profile.username}` : "User");
+    (profile?.username ? `@${profile.username}` : t.common.user);
 
   const [installBannerDismissed, setInstallBannerDismissed] = useState(readInstallBannerDismissed);
 
@@ -300,7 +300,7 @@ export default function Layout({ children }: LayoutProps) {
         })}
         <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground/50">
           <Shield className="w-5 h-5" />
-          <span>Safe</span>
+          <span>{t.scan.unverified}</span>
         </div>
       </nav>
     </div>

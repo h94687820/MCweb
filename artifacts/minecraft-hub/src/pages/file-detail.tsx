@@ -43,15 +43,16 @@ import { useLanguage } from "@/contexts/language-context";
 import type { UploadedFile } from "@workspace/api-client-react";
 
 function ScanStatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   const map: Record<string, { label: string; className: string }> = {
-    pending: { label: "Pending Scan", className: "bg-muted text-muted-foreground" },
-    scanning: { label: "Scanning...", className: "bg-yellow-500/20 text-yellow-400 animate-pulse" },
-    clean: { label: "Clean", className: "bg-green-500/20 text-green-400" },
-    malicious: { label: "Malicious", className: "bg-red-500/20 text-red-400" },
-    error: { label: "Scan Error", className: "bg-orange-500/20 text-orange-400" },
-    skipped: { label: "Not Scanned (small file)", className: "bg-blue-500/20 text-blue-400" },
+    pending: { label: t.scan.pending, className: "bg-muted text-muted-foreground" },
+    scanning: { label: t.scan.scanning, className: "bg-yellow-500/20 text-yellow-400 animate-pulse" },
+    clean: { label: t.scan.clean, className: "bg-green-500/20 text-green-400" },
+    malicious: { label: t.scan.malicious, className: "bg-red-500/20 text-red-400" },
+    error: { label: t.scan.error, className: "bg-orange-500/20 text-orange-400" },
+    skipped: { label: t.scan.skipped, className: "bg-blue-500/20 text-blue-400" },
   };
-  const s = map[status] ?? map.pending;
+  const s = map[status] ?? { label: t.scan.unverified, className: "bg-muted text-muted-foreground" };
   return (
     <span className={cn("inline-flex items-center px-2.5 py-1 text-xs font-mono font-semibold rounded-sm", s.className)}>
       {s.label}
@@ -75,6 +76,7 @@ function resolveImageUrl(urlOrFilename: string, base: string): string {
 }
 
 function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGalleryProps) {
+  const { t } = useLanguage();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +103,7 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Screenshots</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t.fileDetail.screenshots}</p>
         {isOwner && (
           <button
             onClick={() => imageInputRef.current?.click()}
@@ -109,7 +111,7 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
-            Add images
+            {t.fileDetail.addImages}
           </button>
         )}
         <input
@@ -125,13 +127,13 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
       {images.length === 0 ? (
         <div className="border border-dashed border-border p-6 flex flex-col items-center gap-2 text-center">
           <ImagePlus className="w-5 h-5 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">No screenshots yet</p>
+          <p className="text-xs text-muted-foreground">{t.fileDetail.noScreenshots}</p>
           {isOwner && (
             <button
               onClick={() => imageInputRef.current?.click()}
               className="text-xs text-primary hover:underline mt-1"
             >
-              Add the first screenshot
+              {t.fileDetail.addFirstScreenshot}
             </button>
           )}
         </div>
@@ -141,11 +143,12 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
             <button
               key={i}
               onClick={() => setLightbox(resolveImageUrl(imgName, base))}
+              aria-label={t.fileDetail.screenshotAlt.replace("{number}", String(i + 1))}
               className="aspect-video bg-card border border-border overflow-hidden hover:border-primary/50 transition-colors"
             >
               <img
                 src={resolveImageUrl(imgName, base)}
-                alt={`Screenshot ${i + 1}`}
+                alt={t.fileDetail.screenshotAlt.replace("{number}", String(i + 1))}
                 className="w-full h-full object-cover"
               />
             </button>
@@ -164,13 +167,14 @@ function ImageGallery({ images, fileId, isOwner, onImagesUpdated }: ImageGallery
           >
             <button
               onClick={() => setLightbox(null)}
+              aria-label={t.fileDetail.closeImage}
               className="absolute top-4 right-4 w-8 h-8 bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
             >
               <X className="w-4 h-4 text-white" />
             </button>
             <img
               src={lightbox}
-              alt="Screenshot"
+              alt={t.fileDetail.screenshots}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />
@@ -189,6 +193,7 @@ interface CoverImageProps {
 }
 
 function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImageProps) {
+  const { t } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -216,7 +221,7 @@ function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImag
   return (
     <div className="bg-card border border-card-border p-5">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Cover Image</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t.fileDetail.coverImage}</p>
         {isOwner && (
           <button
             onClick={() => coverInputRef.current?.click()}
@@ -224,7 +229,7 @@ function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImag
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-            {coverImage ? "Change cover" : "Add cover image"}
+            {coverImage ? t.fileDetail.changeCover : t.fileDetail.addCover}
           </button>
         )}
         <input
@@ -240,7 +245,7 @@ function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImag
         <div className="aspect-video bg-background border border-border overflow-hidden">
           <img
             src={resolveImageUrl(coverImage, base)}
-            alt="Cover"
+            alt={t.fileDetail.coverAlt}
             className="w-full h-full object-cover"
           />
         </div>
@@ -250,7 +255,7 @@ function CoverImageSection({ coverImage, fileId, isOwner, onUpdated }: CoverImag
           className="w-full border border-dashed border-border p-6 flex flex-col items-center gap-2 text-center hover:border-primary/50 transition-colors"
         >
           <ImagePlus className="w-5 h-5 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">No cover image yet — add one to feature it on the dashboard</p>
+          <p className="text-xs text-muted-foreground">{t.fileDetail.noCover}</p>
         </button>
       )}
     </div>
@@ -267,6 +272,7 @@ interface DescriptionEditorProps {
 }
 
 function DescriptionEditor({ fileId, title, customId, initialDescription, isOwner, onUpdated }: DescriptionEditorProps) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialDescription ?? "");
   const [saving, setSaving] = useState(false);
@@ -297,14 +303,14 @@ function DescriptionEditor({ fileId, title, customId, initialDescription, isOwne
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Description</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t.fileDetail.description}</p>
         {isOwner && !editing && (
           <button
             onClick={() => setEditing(true)}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <Edit2 className="w-3 h-3" />
-            Edit
+            {t.fileDetail.edit}
           </button>
         )}
       </div>
@@ -314,7 +320,7 @@ function DescriptionEditor({ fileId, title, customId, initialDescription, isOwne
           <textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Add a description for this file..."
+            placeholder={t.fileDetail.descriptionPlaceholder}
             rows={4}
             maxLength={2000}
             autoFocus
@@ -323,11 +329,11 @@ function DescriptionEditor({ fileId, title, customId, initialDescription, isOwne
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handleSave} disabled={saving} className="h-7 text-xs px-3">
               {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
-              Save
+              {saving ? t.fileDetail.saving : t.fileDetail.save}
             </Button>
             <Button size="sm" variant="ghost" onClick={handleCancel} className="h-7 text-xs px-3">
               <X className="w-3 h-3 mr-1" />
-              Cancel
+              {t.fileDetail.cancel}
             </Button>
           </div>
         </div>
@@ -339,11 +345,11 @@ function DescriptionEditor({ fileId, title, customId, initialDescription, isOwne
             onClick={() => setEditing(true)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            + Add a description
+            {t.fileDetail.addDescription}
           </button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground italic">No description provided.</p>
+        <p className="text-xs text-muted-foreground italic">{t.fileDetail.noDescription}</p>
       )}
     </div>
   );
@@ -380,7 +386,7 @@ export default function FileDetailPage() {
 
   function handleDelete() {
     if (!file) return;
-    if (!window.confirm("Delete this file permanently? This cannot be undone.")) return;
+    if (!window.confirm(t.fileDetail.deleteConfirmation)) return;
     deleteMutation.mutate({ id: file.id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListFilesQueryKey() });
@@ -418,12 +424,12 @@ export default function FileDetailPage() {
       <div className="p-6 md:p-8 max-w-3xl">
         <button onClick={() => navigate("/")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t.fileDetail.back}
         </button>
         <div className="border border-dashed border-border p-12 flex flex-col items-center gap-3 text-center">
           <FileX className="w-8 h-8 text-muted-foreground" />
-          <p className="font-medium">File not found</p>
-          <p className="text-xs text-muted-foreground">This file may have been deleted</p>
+          <p className="font-medium">{t.fileDetail.notFound}</p>
+          <p className="text-xs text-muted-foreground">{t.fileDetail.fileNotFoundHint}</p>
         </div>
       </div>
     );
@@ -446,7 +452,7 @@ export default function FileDetailPage() {
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
+        {t.fileDetail.backToDashboard}
       </motion.button>
 
       {/* Header */}
@@ -457,7 +463,7 @@ export default function FileDetailPage() {
             {file.coverImage && (
               <img
                 src={resolveImageUrl(file.coverImage, base)}
-                alt={`${file.title || file.originalName} cover`}
+                alt={`${t.fileDetail.coverAlt}: ${file.title || file.originalName}`}
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(event) => { event.currentTarget.remove(); }}
               />
@@ -479,17 +485,17 @@ export default function FileDetailPage() {
                   onClick={handleRescan}
                   disabled={rescanMutation.isPending}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                  title="Retry the VirusTotal scan"
+                  title={t.fileDetail.retryScan}
                 >
                   <RotateCw className={cn("w-3 h-3", rescanMutation.isPending && "animate-spin")} />
-                  Retry scan
+                  {t.fileDetail.retryScan}
                 </button>
               )}
-              <span className="text-xs text-muted-foreground capitalize font-medium">{file.type}</span>
+              <span className="text-xs text-muted-foreground capitalize font-medium">{file.type === "mod" ? t.library.mod : t.library.map}</span>
               <span className="text-xs text-muted-foreground">·</span>
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <EditionIcon className="w-3 h-3" />
-                {file.edition === "java" ? "Java Edition" : "Bedrock Edition"}
+                {file.edition === "java" ? t.home.javaEdition : t.home.bedrockEdition}
               </span>
               <span className="text-xs font-mono text-primary" data-testid="text-current-game-version">
                 {t.fileDetail.gameVersionLabel}: {latestRelease.gameVersion || "—"}
@@ -503,7 +509,8 @@ export default function FileDetailPage() {
               className="h-9 w-9 flex-shrink-0 hover:text-destructive"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              title="Delete file"
+              title={t.fileDetail.deleteFile}
+              aria-label={t.fileDetail.deleteFile}
             >
               {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             </Button>
@@ -523,14 +530,14 @@ export default function FileDetailPage() {
           <div className="bg-card border border-card-border p-3 flex items-center gap-3">
             <HardDrive className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">File size</p>
+              <p className="text-xs text-muted-foreground">{t.fileDetail.fileSize}</p>
               <p className="text-sm font-mono font-medium">{formatBytes(latestRelease.size)}</p>
             </div>
           </div>
           <div className="bg-card border border-card-border p-3 flex items-center gap-3">
             <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Uploaded</p>
+              <p className="text-xs text-muted-foreground">{t.fileDetail.uploadedAt}</p>
               <p className="text-sm font-medium">{date}</p>
             </div>
           </div>
@@ -582,21 +589,23 @@ export default function FileDetailPage() {
 
         {/* File info */}
         <div className="border border-border p-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">File Info</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{t.fileDetail.fileInfo}</p>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Internal name</span>
+            <span className="text-muted-foreground">{t.fileDetail.internalName}</span>
             <span className="font-mono text-foreground truncate max-w-[60%] text-right">{file.originalName}</span>
           </div>
           {file.mimeType && (
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">MIME type</span>
+              <span className="text-muted-foreground">{t.fileDetail.mimeType}</span>
               <span className="font-mono text-foreground">{file.mimeType}</span>
             </div>
           )}
           {file.detectionRatio && (
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Detection ratio</span>
-              <span className="font-mono text-foreground">{file.detectionRatio} engines</span>
+              <span className="text-muted-foreground">{t.fileDetail.detectionRatio}</span>
+              <span className="font-mono text-foreground">
+                {t.fileDetail.detectionRatioEngines.replace("{ratio}", file.detectionRatio)}
+              </span>
             </div>
           )}
         </div>

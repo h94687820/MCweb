@@ -89,7 +89,7 @@ function FileRow({ file, onOpen }: { file: UploadedFile; onOpen: () => void }) {
 
   function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm(t.fileDetail.deleteFile + "?")) return;
+    if (!window.confirm(t.fileDetail.deleteConfirmation)) return;
     deleteMutation.mutate({ id: file.id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListFilesQueryKey() });
@@ -170,7 +170,7 @@ function EditionChooser({ onChoose }: { onChoose: (edition: Edition) => void }) 
   ];
   return (
     <motion.section className="edition-stage" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.12 } } }} aria-label={t.home.chooseEdition}>
-      <div className="edition-stage-top"><span className="atlas-eyebrow"><Compass /> {t.home.worldIndex}</span><span className="atlas-coordinates">40°42′ / 73°59′</span></div>
+      <div className="edition-stage-top"><span className="atlas-eyebrow"><Compass /> {t.home.worldIndex}</span><span className="atlas-coordinates" aria-hidden="true" /></div>
       <div className="edition-world">
         <div className="world-art" aria-hidden="true" />
         <div className="world-scanline" aria-hidden="true" />
@@ -201,8 +201,8 @@ function EditionChooser({ onChoose }: { onChoose: (edition: Edition) => void }) 
             </motion.button>
           ))}
         </div>
-        <div className="world-caption"><span>{t.home.worldsAwait}</span><span>WW / ATLAS 01</span></div>
       </div>
+      <div className="world-caption"><span>{t.home.worldsAwait}</span><span aria-hidden="true" /></div>
       <div className="edition-stage-foot"><span>{t.home.hubNote}</span><span className="foot-rule" /><span>{t.home.communityLibrary}</span></div>
     </motion.section>
   );
@@ -227,7 +227,7 @@ function CategoryChooser({ edition, onBack, onChoose }: { edition: Edition; onBa
       <div className={cn("category-landscape", java ? "landscape-java" : "landscape-bedrock")}>
         <div className="landscape-haze" />
         <div className="category-options">
-          {options.map(({ id, label, sub, count, icon: Icon }, index) => (
+          {options.map(({ id, label, sub, count, icon: Icon }) => (
             <motion.button
               key={id}
               variants={enter}
@@ -235,7 +235,7 @@ function CategoryChooser({ edition, onBack, onChoose }: { edition: Edition; onBa
               data-testid={`button-category-${id}`}
               className={`category-choice category-choice-${id}`}
             >
-              <span className="category-index">PATH 0{index + 1}</span>
+              <span className="category-index" aria-hidden="true" />
               <Icon className="category-icon" strokeWidth={1.3} />
               <span className="category-label">{label}</span>
               <span className="category-desc">{sub}</span>
@@ -244,7 +244,7 @@ function CategoryChooser({ edition, onBack, onChoose }: { edition: Edition; onBa
             </motion.button>
           ))}
         </div>
-        <div className="landscape-mark"><Mountain /><span>EXPLORE / {java ? "01" : "02"}</span></div>
+        <div className="landscape-mark"><Mountain /><span>{java ? t.home.javaEdition : t.home.bedrockEdition}</span></div>
       </div>
     </motion.section>
   );
@@ -267,7 +267,7 @@ function FileLibrary({ edition, type, onBack }: { edition: Edition; type: FileTy
       <motion.div variants={enter} className="library-heading">
         <div>
           <span className="atlas-eyebrow"><Layers3 /> {edition === "java" ? t.home.javaEdition : t.home.bedrockEdition} / {title}</span>
-          <h1>{title}<span className="heading-period">.</span></h1>
+          <h1>{title}</h1>
           <p>{t.home.librarySubtitle}</p>
         </div>
         <div className="library-total"><span>{isLoading ? "—" : results.length.toString().padStart(2, "0")}</span><small>{t.home.matchingFiles}</small></div>

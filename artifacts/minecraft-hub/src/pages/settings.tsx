@@ -211,12 +211,12 @@ export default function SettingsPage() {
             <motion.div variants={item}>
               <div className="flex items-center gap-2 mb-4">
                 <LogOut className="w-4 h-4 text-primary" />
-                <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Account</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">{t.settings.account}</h2>
               </div>
               <div className="bg-card border border-card-border p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Sign out</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account on this device</p>
+                  <p className="text-sm font-medium">{t.nav.signOut}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.settings.signOutDescription}</p>
                 </div>
                 <button
                   onClick={() => void signOut({ redirectUrl: basePath || "/" })}
@@ -224,7 +224,7 @@ export default function SettingsPage() {
                   className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border border-border hover:border-primary/60 hover:text-primary transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  Sign out
+                  {t.nav.signOut}
                 </button>
               </div>
             </motion.div>

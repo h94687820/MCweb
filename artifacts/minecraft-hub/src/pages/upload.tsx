@@ -53,7 +53,7 @@ const EDITION_ACCEPT: Record<Edition, string> = {
 };
 
 const EDITION_HINT: Record<Edition, string> = {
-  java: ".jar, .zip — Java mods and world exports",
+  java: ".jar · .zip",
   bedrock: ".mcpack · .mcworld · .mcaddon · .mctemplate",
 };
 
@@ -141,10 +141,33 @@ export default function UploadPage() {
 
   function validateTitle(): boolean {
     if (!title.trim()) {
-      setTitleError("Title is required");
+      setTitleError(t.upload.titleRequired);
       return false;
     }
     return true;
+  }
+
+  function translateUploadError(message: string, status: number): string {
+    const normalized = message.toLowerCase();
+    if (normalized.includes("does not accept") || normalized.includes("unsupported file extension")) {
+      return t.upload.unsupportedType;
+    }
+    if (normalized.includes("valid zip-based")) return t.upload.invalidArchive;
+    if (normalized.includes("image does not match") || normalized.includes("unsupported image extension")) {
+      return t.upload.imageFormatMismatch;
+    }
+    if (normalized.includes("rejected by the safety check")) return t.upload.imageRejected;
+    if (normalized.includes("image moderation") || normalized.includes("deepai")) {
+      return t.upload.imageModerationUnavailable;
+    }
+    if (normalized.includes("release") && normalized.includes("already exists")) {
+      return t.upload.duplicateRelease;
+    }
+    if (normalized.includes("storage service unavailable")) return t.upload.storageUnavailable;
+    if (status === 413 || normalized.includes("exceeds the allowed size")) {
+      return selectedUploadBytes() > MAX_TOTAL_UPLOAD_SIZE ? t.upload.totalSizeLimit : t.upload.fileTooLarge;
+    }
+    return status >= 500 ? t.upload.uploadFailed : t.upload.invalidUpload;
   }
 
   function validateGameVersion(): boolean {
@@ -265,7 +288,7 @@ export default function UploadPage() {
 
       const authToken = await getToken();
       if (!authToken) {
-        throw new Error("Your sign-in session is unavailable. Please sign in again.");
+        throw new Error(t.upload.sessionUnavailable);
       }
 
       const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -290,31 +313,31 @@ export default function UploadPage() {
             statusText: request.statusText,
           }));
         });
-        request.addEventListener("error", () => reject(new Error("Network error while uploading the file")));
-        request.addEventListener("abort", () => reject(new Error("Upload was interrupted")));
+        request.addEventListener("error", () => reject(new Error(t.upload.networkError)));
+        request.addEventListener("abort", () => reject(new Error(t.upload.uploadInterrupted)));
         request.send(formData);
       });
 
       const data = await response.json().catch(() => ({})) as UploadResponsePayload;
       if (!response.ok) {
-        const errMsg = data.error ?? `Upload failed (${response.status})`;
+        const errMsg = typeof data.error === "string" ? data.error : "";
         if (!isVersionUpload && (response.status === 409 || errMsg.toLowerCase().includes("taken"))) {
           setCustomIdError(t.upload.customIdTaken);
           setUploadState("idle");
           return;
         }
-        throw new Error(errMsg);
+        throw new Error(translateUploadError(errMsg, response.status));
       }
 
       if (data.moderationWarning) {
         const warning = data.moderationWarning;
         const reason = warning.code === "http_error"
-          ? `DeepAI HTTP ${warning.status ?? "unknown"}`
+          ? t.upload.deepAiHttpError.replace("{status}", String(warning.status ?? "—"))
           : warning.code === "missing_key"
-            ? "DeepAI API key missing"
+            ? t.upload.deepAiKeyMissing
             : warning.code === "network_error"
-              ? "DeepAI network error"
-              : "DeepAI response invalid";
+              ? t.upload.deepAiNetworkError
+              : t.upload.deepAiInvalidResponse;
         setModerationWarning(t.upload.moderationSkipped.replace("{reason}", reason));
       }
 
@@ -350,7 +373,9 @@ export default function UploadPage() {
     } catch (err) {
       setUploadProgress(0);
       setUploadState("error");
-      setErrorMessage(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "";
+      const uploadErrors: string[] = Object.values(t.upload);
+      setErrorMessage(uploadErrors.includes(message) ? message : t.upload.uploadFailed);
     } finally {
       uploadInProgressRef.current = false;
     }
@@ -562,7 +587,9 @@ export default function UploadPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-sm">{t.upload.dropHint}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{EDITION_HINT[edition]} · {t.upload.maxSize}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t.upload.acceptedFileTypes}: {EDITION_HINT[edition]} · {t.upload.maxSize}
+                    </p>
                   </div>
                 </motion.div>
               ) : (
@@ -574,29 +601,26 @@ export default function UploadPage() {
                     <p className="font-medium text-sm truncate" data-testid="text-selected-filename" title={selectedFile.name}>{selectedFile.name}</p>
                     <p className="text-xs text-muted-foreground font-mono">{formatBytes(selectedFile.size)}</p>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); handleClearFile(); }} data-testid="button-clear-file">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => { e.stopPropagation(); handleClearFile(); }} aria-label={t.upload.removeSelectedFile} data-testid="button-clear-file">
                     <X className="w-4 h-4" />
                   </Button>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          <p className="text-xs text-muted-foreground mt-2 font-mono">
-            {edition === "java" ? "Java Edition: .jar · .zip" : "Bedrock Edition: .mcpack · .mcworld · .mcaddon · .mctemplate"}
-          </p>
         </div>
 
         {!isVersionUpload && (
           <>
         {/* Step 3.5: Title */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Title</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{t.upload.titleLabel}</p>
           <input
             type="text"
             value={title}
             onChange={(e) => { setTitle(e.target.value); setTitleError(""); }}
-            onBlur={() => !title.trim() && setTitleError("Title is required")}
-            placeholder="Give your file a name shown to other users"
+            onBlur={() => !title.trim() && setTitleError(t.upload.titleRequired)}
+            placeholder={t.upload.titlePlaceholder}
             maxLength={100}
             data-testid="input-title"
             className={cn(
@@ -664,13 +688,14 @@ export default function UploadPage() {
         {/* Step 5.5: Cover Image */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-            Cover Image <span className="normal-case font-normal">{t.upload.stepImagesOptional}</span>
+            {t.upload.coverImage} <span className="normal-case font-normal">{t.upload.stepImagesOptional}</span>
           </p>
           {coverImage ? (
             <div className="relative group aspect-video bg-card border border-border overflow-hidden max-w-xs">
-              <img src={URL.createObjectURL(coverImage)} alt="Cover preview" className="w-full h-full object-cover" />
+              <img src={URL.createObjectURL(coverImage)} alt={t.upload.coverPreview} className="w-full h-full object-cover" />
               <button
                 onClick={removeCoverImage}
+                aria-label={t.upload.removeCoverImage}
                 className="absolute top-1 right-1 w-5 h-5 bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3 text-white" />
@@ -682,7 +707,7 @@ export default function UploadPage() {
               className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-border hover:border-primary/50 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ImagePlus className="w-4 h-4" />
-              Add a cover image
+              {t.upload.addCoverImage}
             </button>
           )}
           <input
@@ -692,7 +717,7 @@ export default function UploadPage() {
             className="hidden"
             onChange={handleCoverImageChange}
           />
-          <p className="text-xs text-muted-foreground mt-2 font-mono">The primary image shown for this file — separate from screenshots</p>
+          <p className="text-xs text-muted-foreground mt-2 font-mono">{t.upload.coverImageHint}</p>
         </div>
 
         {/* Step 6: Images */}
@@ -712,6 +737,7 @@ export default function UploadPage() {
                   />
                   <button
                     onClick={() => removeImage(i)}
+                    aria-label={t.upload.removeImage}
                     className="absolute top-1 right-1 w-5 h-5 bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-3 h-3 text-white" />
@@ -740,7 +766,7 @@ export default function UploadPage() {
             className="hidden"
             onChange={handleImagesChange}
           />
-          <p className="text-xs text-muted-foreground mt-2 font-mono">JPG · PNG · GIF · WebP · max 10 MB each</p>
+          <p className="text-xs text-muted-foreground mt-2 font-mono">{t.upload.imageFormatsHint}</p>
           <p className="text-xs text-muted-foreground mt-1">{t.upload.totalSizeLimit}</p>
         </div>
           </>

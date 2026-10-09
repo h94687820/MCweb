@@ -138,7 +138,7 @@ export default function LibraryPage() {
   if (!isSignedIn) {
     return (
       <section className="creator-library library-gate" data-testid="library-signin-gate">
-        <div className="library-index">CREATOR / PRIVATE WORKSPACE</div>
+        <div className="library-index">{t.library.privateWorkspace}</div>
         <div className="library-gate-mark"><BookOpen aria-hidden="true" /></div>
         <h1>{t.library.signInTitle}</h1>
         <p>{t.library.signInDescription}</p>
@@ -156,7 +156,7 @@ export default function LibraryPage() {
           <ArrowLeft aria-hidden="true" /> {t.library.back}
         </Link>
         <span className="library-index"><i /> {t.library.privateWorkspace}</span>
-        <span className="library-edition-note">JAVA <b>×</b> BEDROCK</span>
+        <span className="library-edition-note">{t.home.editionCount}</span>
       </div>
 
       <header className="creator-library-heading">
@@ -170,7 +170,7 @@ export default function LibraryPage() {
       <div className="library-overview">
         <span className="overview-icon"><Layers3 aria-hidden="true" /></span>
         <div className="library-overview-note">
-          <span className="overview-coordinate">HUB / 01</span>
+          <span className="overview-coordinate" aria-hidden="true" />
           <p>{t.library.versionNote}</p>
           <ArrowDownRight aria-hidden="true" />
         </div>
@@ -178,7 +178,7 @@ export default function LibraryPage() {
       </div>
 
       <div className="library-list-heading">
-        <div><span className="library-section-index">A—</span><h2>{t.library.collection}</h2></div>
+        <div><span className="library-section-index" aria-hidden="true" /><h2>{t.library.collection}</h2></div>
         <span>{t.library.latestFirst}</span>
       </div>
 
@@ -194,7 +194,7 @@ export default function LibraryPage() {
         </div>
       ) : items.length === 0 ? (
         <div className="library-empty" data-testid="library-empty">
-          <div className="empty-stamp">NO / ITEMS</div>
+          <div className="empty-stamp" aria-hidden="true" />
           <div className="empty-art"><Code2 aria-hidden="true" /><span /><span /></div>
           <div>
             <h3>{t.library.emptyTitle}</h3>
@@ -266,7 +266,6 @@ export default function LibraryPage() {
                       </Link>
                     ))}
                   </div>
-                  <span className="release-root">ROOT {item.rootFileId}</span>
                 </aside>
               </article>
             );
@@ -276,7 +275,6 @@ export default function LibraryPage() {
 
       <footer className="creator-library-footer">
         <span><ShieldCheck aria-hidden="true" /> {t.library.footerSafe}</span>
-        <span>{t.library.footerLabel} <b>—</b> 01</span>
       </footer>
 
       {editing && (
@@ -284,7 +282,7 @@ export default function LibraryPage() {
           if (event.target === event.currentTarget && !updateMetadata.isPending) setEditing(null);
         }}>
           <section className="library-edit-panel" role="dialog" aria-modal="true" aria-labelledby="edit-item-title" data-testid="dialog-edit-item">
-            <div className="edit-panel-topline"><span>{t.library.editingItem} / {editing.rootFileId}</span><button type="button" onClick={() => setEditing(null)} aria-label={t.library.close} data-testid="button-close-editor"><X /></button></div>
+            <div className="edit-panel-topline"><span>{t.library.editingItem.replace("{title}", editing.current.title || editing.current.customId || editing.current.originalName)}</span><button type="button" onClick={() => setEditing(null)} aria-label={t.library.close} data-testid="button-close-editor"><X /></button></div>
             <h2 id="edit-item-title">{t.library.editTitle}</h2>
             <p>{t.library.editDescription}</p>
             <form onSubmit={saveMetadata}>

@@ -134,6 +134,15 @@
   --sidebar-accent-foreground: 42 30% 93%;
 }
 
+/* Theme: Default (Gray neutral) */
+.theme-default {
+  --primary: 240 5.9% 80%;
+  --primary-foreground: 240 10% 8%;
+  --ring: 240 5.9% 80%;
+  --sidebar-primary: 240 5.9% 80%;
+  --sidebar-primary-foreground: 240 10% 8%;
+}
+
 /* Theme: Creeper (Green) */
 .theme-creeper {
   --primary: 142 71% 45%;
